@@ -1,0 +1,173 @@
+@import url("https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css");
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+
+  --color-bg: #f8fafc;
+  --color-text: #1e293b;
+}
+
+html {
+  direction: rtl;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Vazirmatn", system-ui, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* ===== انیمیشن‌ها ===== */
+
+@keyframes welcomeAnimation {
+  0% {
+    opacity: 0;
+    transform: scale(1.5) translateY(20px);
+    filter: blur(15px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes subtleGlow {
+  0%, 100% { text-shadow: 0 0 20px rgba(237, 110, 43, 0.3); }
+  50% { text-shadow: 0 0 40px rgba(237, 110, 43, 0.6); }
+}
+
+.animate-welcome {
+  animation: welcomeAnimation 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-glow {
+  animation: subtleGlow 4s ease-in-out infinite;
+}
+
+.reveal-up {
+  opacity: 0;
+  transform: translateY(50px);
+  transition: all 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-up.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== سایدبار و داشبورد ===== */
+
+.mobile-menu-btn {
+  display: none;
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 60;
+  background-color: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 55;
+}
+
+.sidebar {
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  width: 256px;
+  background-color: #0f172a;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #1e293b;
+  z-index: 40;
+  transform: translateX(0);
+  transition: transform 0.3s ease-in-out;
+}
+
+.dashboard-content {
+  margin-right: 256px;
+}
+
+/* اطمینان از قابل کلیک بودن آیتم‌های سایدبار */
+.sidebar a,
+.sidebar button {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+}
+
+/* ===== موبایل ===== */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(100%);
+    box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+  }
+
+  .sidebar.open {
+    transform: translateX(0) !important;
+    z-index: 70 !important;
+  }
+
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+
+  .mobile-overlay.show {
+    display: block !important;
+  }
+
+  .dashboard-content {
+    margin-right: 0 !important;
+  }
+
+  /* جداول */
+  table {
+    font-size: 12px !important;
+  }
+
+  th, td {
+    padding: 8px !important;
+  }
+
+  /* فونت‌ها */
+  h1 { font-size: 20px !important; }
+  h2 { font-size: 16px !important; }
+  h3 { font-size: 14px !important; }
+
+  main {
+    padding: 16px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .erp-modal-container {
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+}

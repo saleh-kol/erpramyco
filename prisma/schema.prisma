@@ -1,0 +1,1031 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Contractors {
+  Contractor_ID          Int                      @id @default(autoincrement())
+  Company_Name           String                   @db.VarChar(150)
+  Specialty              String?                  @db.VarChar(100)
+  Contact_Info           String?                  @db.VarChar(250)
+  Hourly_Rate            Decimal?                 @default(0.00) @db.Decimal(18, 2)
+  Currency               String?                  @default("IRR") @db.VarChar(10)
+  IsActive               Boolean?                 @default(true)
+  KPI_Seasonal_Snapshots KPI_Seasonal_Snapshots[]
+  Work_Orders            Work_Orders[]
+  Work_Orders_Archive    Work_Orders_Archive[]
+}
+
+model Equipment {
+  Equipment_ID          Int                         @id @default(autoincrement())
+  Equipment_Code        String                      @unique(map: "Equipment_Code") @db.VarChar(50)
+  ERP_Code              String?                     @db.VarChar(50)
+  Equipment_Name        String                      @db.VarChar(150)
+  Machine_ID            Int
+  Criticality_Level     Equipment_Criticality_Level @default(Normal)
+  Equipment_Price       Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Currency              String?                     @default("IRR") @db.VarChar(10)
+  Purchase_Date         DateTime?                   @db.Date
+  Equipment_Image_Path  String?                     @db.VarChar(500)
+  Warranty_Months       Int?                        @default(0)
+  IsActive              Boolean?                    @default(true)
+  Machines              Machines                    @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Equipment_Machines")
+  Equipment_Spare_Parts Equipment_Spare_Parts[]
+  PM_Schedules          PM_Schedules[]
+  Work_Orders           Work_Orders[]
+  Work_Orders_Archive   Work_Orders_Archive[]
+
+  @@index([Equipment_Code], map: "IX_Equipment_Code")
+  @@index([Machine_ID], map: "IX_Equipment_MachineID")
+}
+
+model Equipment_Spare_Parts {
+  Equipment_ID      Int
+  Part_ID           Int
+  Quantity_Per_Unit Int         @default(1)
+  Is_Standard       Boolean?    @default(true)
+  Equipment         Equipment   @relation(fields: [Equipment_ID], references: [Equipment_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_EQP_Equipment")
+  Spare_Parts       Spare_Parts @relation(fields: [Part_ID], references: [Part_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_EQP_SpareParts")
+
+  @@id([Equipment_ID, Part_ID])
+  @@index([Equipment_ID], map: "IX_Equipment_Parts_Equip")
+  @@index([Part_ID], map: "IX_Equipment_Parts_Part")
+}
+
+model Failure_Codes {
+  Failure_ID          Int                   @id @default(autoincrement())
+  Failure_Code        String                @unique(map: "Failure_Code") @db.VarChar(30)
+  Failure_Name        String                @db.VarChar(100)
+  Work_Orders         Work_Orders[]
+  Work_Orders_Archive Work_Orders_Archive[]
+}
+
+model KPI_Seasonal_Snapshots {
+  Snapshot_ID   Int          @id @default(autoincrement())
+  Year_No       Int
+  Season_No     Int
+  Machine_ID    Int?
+  Contractor_ID Int?
+  KPI_Name      String       @db.VarChar(50)
+  KPI_Value     Decimal?     @db.Decimal(10, 2)
+  Snapshot_Date DateTime?    @default(now()) @db.DateTime(0)
+  Contractors   Contractors? @relation(fields: [Contractor_ID], references: [Contractor_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_KPI_Contractor")
+  Machines      Machines?    @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_KPI_Machine")
+
+  @@index([Contractor_ID], map: "Contractor_ID")
+  @@index([Machine_ID], map: "Machine_ID")
+}
+
+model Machine_Runtime_Log {
+  Log_ID        Int                          @id @default(autoincrement())
+  Machine_ID    Int
+  Log_Date      DateTime                     @default(now()) @db.DateTime(0)
+  Runtime_Hours Decimal                      @db.Decimal(18, 2)
+  Log_Type      Machine_Runtime_Log_Log_Type
+  Note          String?                      @db.VarChar(255)
+  Machines      Machines                     @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Runtime_Machine")
+
+  @@index([Machine_ID, Log_Date], map: "IX_Runtime_Machine_Date")
+}
+
+model Machines {
+  Machine_ID              Int                        @id @default(autoincrement())
+  Machine_Code            String                     @unique(map: "Machine_Code") @db.VarChar(50)
+  Machine_Name            String                     @db.VarChar(150)
+  Line_ID                 Int
+  Brand_Model             String?                    @db.VarChar(100)
+  Specifications          String?                    @db.Text
+  Installation_Date       DateTime?                  @db.Date
+  Last_Maintenance_Date   DateTime?                  @db.Date
+  Runtime_Hours           Decimal?                   @default(0.00) @db.Decimal(18, 2)
+  Criticality_Level       Machines_Criticality_Level @default(Normal)
+  Machine_Status          Machines_Machine_Status?   @default(Ready_for_work)
+  IsActive                Boolean?                   @default(true)
+  Equipment               Equipment[]
+  KPI_Seasonal_Snapshots  KPI_Seasonal_Snapshots[]
+  Machine_Runtime_Log     Machine_Runtime_Log[]
+  Production_Lines        Production_Lines           @relation(fields: [Line_ID], references: [Line_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Machines_ProductionLines")
+  PM_Schedules            PM_Schedules[]
+  Supervisor_Machines     Supervisor_Machines[]
+  TPM_Checklist_Templates TPM_Checklist_Templates[]
+  Work_Orders             Work_Orders[]
+  Work_Orders_Archive     Work_Orders_Archive[]
+
+  @@index([Line_ID], map: "IX_Machines_LineID")
+  @@index([Machine_Status], map: "IX_Machines_Status")
+}
+
+model Maintenance_Strategies {
+  Strategy_ID         Int                   @id @default(autoincrement())
+  Strategy_Code       String                @unique(map: "Strategy_Code") @db.VarChar(10)
+  Strategy_Name       String                @db.VarChar(50)
+  PM_Schedules        PM_Schedules[]
+  Work_Orders         Work_Orders[]
+  Work_Orders_Archive Work_Orders_Archive[]
+}
+
+model PM_Schedules {
+  Schedule_ID            Int                    @id @default(autoincrement())
+  Machine_ID             Int
+  Equipment_ID           Int?
+  Strategy_ID            Int                    @default(4)
+  Task_Description       String                 @db.VarChar(500)
+  Interval_Runtime_Hours Decimal?               @db.Decimal(10, 2)
+  Interval_Days          Int?
+  Last_Done_Date         DateTime?              @db.Date
+  Last_Done_Runtime      Decimal?               @db.Decimal(18, 2)
+  Next_Due_Date          DateTime?              @db.Date
+  Next_Due_Runtime       Decimal?               @db.Decimal(18, 2)
+  Estimated_Cost         Decimal?               @default(0.00) @db.Decimal(18, 2)
+  IsActive               Boolean?               @default(true)
+  Equipment              Equipment?             @relation(fields: [Equipment_ID], references: [Equipment_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PM_Equipment")
+  Machines               Machines               @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PM_Machine")
+  Maintenance_Strategies Maintenance_Strategies @relation(fields: [Strategy_ID], references: [Strategy_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PM_Strategy")
+
+  @@index([Equipment_ID], map: "Equipment_ID")
+  @@index([Machine_ID, Next_Due_Date], map: "IX_PM_Schedule_Machine")
+  @@index([Strategy_ID], map: "Strategy_ID")
+}
+
+model PR_Bonus_Types {
+  Bonus_Type_ID             Int                         @id @default(autoincrement())
+  Bonus_Code                String                      @unique(map: "UK_Bonus_Code") @db.VarChar(30)
+  Bonus_Name                String                      @db.VarChar(100)
+  Is_Fixed                  Boolean?                    @default(false)
+  Default_Value             Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Description               String?                     @db.Text
+  Is_Active                 Boolean?                    @default(true)
+  PR_Monthly_Salary_Details PR_Monthly_Salary_Details[]
+}
+
+model PR_Commute_Logs {
+  Commute_ID                                        Int                           @id @default(autoincrement())
+  Personnel_ID                                      Int
+  Commute_Date                                      DateTime                      @db.Date
+  Commute_Type                                      PR_Commute_Logs_Commute_Type? @default(PersonalVehicle)
+  Status                                            PR_Commute_Logs_Status        @default(Pending)
+  Origin                                            String?                       @db.VarChar(255)
+  Destination                                       String?                       @db.VarChar(255)
+  Distance_KM                                       Decimal?                      @default(0.00) @db.Decimal(8, 2)
+  Amount                                            Decimal?                      @default(0.00) @db.Decimal(18, 2)
+  Receipt_Number                                    String?                       @db.VarChar(50)
+  Description                                       String?                       @db.VarChar(255)
+  Is_Approved                                       Boolean?                      @default(false)
+  Approved_By                                       Int?
+  Approved_At                                       DateTime?                     @db.DateTime(0)
+  Created_At                                        DateTime?                     @default(now()) @db.DateTime(0)
+  Manager_Score                                     Decimal?                      @db.Decimal(5, 2)
+  Manager_Comment                                   String?                       @db.VarChar(500)
+  Manager_ID                                        Int?
+  Personnel_PR_Commute_Logs_Approved_ByToPersonnel  Personnel?                    @relation("PR_Commute_Logs_Approved_ByToPersonnel", fields: [Approved_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Commute_Approver")
+  Personnel_PR_Commute_Logs_Personnel_IDToPersonnel Personnel                     @relation("PR_Commute_Logs_Personnel_IDToPersonnel", fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Commute_Personnel")
+
+  @@index([Approved_By], map: "IX_PR_Commute_Approver")
+  @@index([Commute_Date], map: "IX_PR_Commute_Date")
+  @@index([Personnel_ID], map: "IX_PR_Commute_Personnel")
+}
+
+model PR_Daily_Reports {
+  Report_ID                                          Int                              @id @default(autoincrement())
+  Personnel_ID                                       Int
+  Report_Date                                        DateTime                         @db.Date
+  Check_In                                           DateTime?                        @db.Time(0)
+  Check_Out                                          DateTime?                        @db.Time(0)
+  Work_Hours                                         Decimal?                         @db.Decimal(5, 2)
+  Work_Type_ID                                       Int?
+  Location_ID                                        Int?
+  Project_ID                                         Int?
+  Work_Description                                   String?                          @db.Text
+  Is_Mission                                         Boolean?                         @default(false)
+  Mission_Destination                                String?                          @db.VarChar(255)
+  Commute_Status                                     PR_Daily_Reports_Commute_Status? @default(None)
+  Commute_Cost                                       Decimal?                         @default(0.00) @db.Decimal(18, 2)
+  Report_Status                                      PR_Daily_Reports_Report_Status?  @default(Draft)
+  Manager_Score                                      Decimal?                         @db.Decimal(5, 2)
+  Manager_Comment                                    String?                          @db.VarChar(500)
+  Manager_ID                                         Int?
+  Reviewed_At                                        DateTime?                        @db.DateTime(0)
+  Calculated_Daily_Amount                            Decimal?                         @default(0.00) @db.Decimal(18, 2)
+  Currency                                           String?                          @default("IRR") @db.VarChar(10)
+  Created_At                                         DateTime?                        @default(now()) @db.DateTime(0)
+  Updated_At                                         DateTime?                        @default(now()) @db.DateTime(0)
+  PR_Work_Locations                                  PR_Work_Locations?               @relation(fields: [Location_ID], references: [Location_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Report_Location")
+  Personnel_PR_Daily_Reports_Manager_IDToPersonnel   Personnel?                       @relation("PR_Daily_Reports_Manager_IDToPersonnel", fields: [Manager_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Report_Manager")
+  Personnel_PR_Daily_Reports_Personnel_IDToPersonnel Personnel                        @relation("PR_Daily_Reports_Personnel_IDToPersonnel", fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Report_Personnel")
+  PR_Projects                                        PR_Projects?                     @relation(fields: [Project_ID], references: [Project_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Report_Project")
+  PR_Work_Types                                      PR_Work_Types?                   @relation(fields: [Work_Type_ID], references: [Work_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Report_WorkType")
+  PR_Manager_Approvals                               PR_Manager_Approvals?
+
+  @@index([Location_ID], map: "FK_PR_Report_Location")
+  @@index([Project_ID], map: "FK_PR_Report_Project")
+  @@index([Work_Type_ID], map: "FK_PR_Report_WorkType")
+  @@index([Report_Date], map: "IX_PR_Report_Date")
+  @@index([Manager_ID], map: "IX_PR_Report_Manager")
+  @@index([Report_Status], map: "IX_PR_Report_Status")
+}
+
+model PR_Deduction_Types {
+  Deduction_Type_ID         Int                         @id @default(autoincrement())
+  Deduction_Code            String                      @unique(map: "UK_Deduction_Code") @db.VarChar(30)
+  Deduction_Name            String                      @db.VarChar(100)
+  Is_Percentage             Boolean?                    @default(false)
+  Default_Value             Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Default_Percent           Decimal?                    @default(0.00) @db.Decimal(5, 2)
+  Description               String?                     @db.Text
+  Is_Active                 Boolean?                    @default(true)
+  PR_Monthly_Salary_Details PR_Monthly_Salary_Details[]
+}
+
+model PR_Leave_Requests {
+  Leave_ID                                            Int                       @id @default(autoincrement())
+  Personnel_ID                                        Int
+  Leave_Type_ID                                       Int
+  Start_Date                                          DateTime                  @db.Date
+  End_Date                                            DateTime                  @db.Date
+  Days_Count                                          Int?
+  Reason                                              String?                   @db.Text
+  Status                                              PR_Leave_Requests_Status? @default(Pending)
+  Requested_At                                        DateTime?                 @default(now()) @db.DateTime(0)
+  Approved_By                                         Int?
+  Approved_At                                         DateTime?                 @db.DateTime(0)
+  Rejection_Reason                                    String?                   @db.VarChar(255)
+  Personnel_PR_Leave_Requests_Approved_ByToPersonnel  Personnel?                @relation("PR_Leave_Requests_Approved_ByToPersonnel", fields: [Approved_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Leave_Approver")
+  Personnel_PR_Leave_Requests_Personnel_IDToPersonnel Personnel                 @relation("PR_Leave_Requests_Personnel_IDToPersonnel", fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Leave_Personnel")
+  PR_Leave_Types                                      PR_Leave_Types            @relation(fields: [Leave_Type_ID], references: [Leave_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Leave_Type")
+
+  @@index([Approved_By], map: "IX_PR_Leave_Approver")
+  @@index([Personnel_ID], map: "IX_PR_Leave_Personnel")
+  @@index([Status], map: "IX_PR_Leave_Status")
+  @@index([Leave_Type_ID], map: "IX_PR_Leave_Type")
+}
+
+model PR_Leave_Types {
+  Leave_Type_ID     Int                 @id @default(autoincrement())
+  Leave_Type_Code   String              @unique(map: "UK_Leave_Type_Code") @db.VarChar(30)
+  Leave_Type_Name   String              @db.VarChar(100)
+  Is_Paid           Boolean?            @default(true)
+  Max_Days_Per_Year Int?
+  Description       String?             @db.Text
+  Is_Active         Boolean?            @default(true)
+  PR_Leave_Requests PR_Leave_Requests[]
+}
+
+model PR_Manager_Approvals {
+  Approval_ID      Int                                   @id @default(autoincrement())
+  Report_ID        Int                                   @unique(map: "UK_Approval_Report")
+  Manager_ID       Int
+  Approval_Score   Decimal                               @default(0.00) @db.Decimal(5, 2)
+  Approval_Comment String?                               @db.VarChar(500)
+  Approval_Status  PR_Manager_Approvals_Approval_Status? @default(Pending)
+  Approved_At      DateTime?                             @default(now()) @db.DateTime(0)
+  Personnel        Personnel                             @relation(fields: [Manager_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Approval_Manager")
+  PR_Daily_Reports PR_Daily_Reports                      @relation(fields: [Report_ID], references: [Report_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Approval_Report")
+
+  @@index([Manager_ID], map: "IX_PR_Approval_Manager")
+}
+
+model PR_Monthly_Salary {
+  Salary_ID                                           Int                         @id @default(autoincrement())
+  Personnel_ID                                        Int
+  Salary_Year                                         Int
+  Salary_Month                                        Int
+  Total_Work_Hours                                    Decimal?                    @default(0.00) @db.Decimal(8, 2)
+  Total_Overtime_Hours                                Decimal?                    @default(0.00) @db.Decimal(8, 2)
+  Total_OffHours_Hours                                Decimal?                    @default(0.00) @db.Decimal(8, 2)
+  Base_Salary                                         Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Overtime_Amount                                     Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  OffHours_Amount                                     Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Mission_Amount                                      Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Commute_Amount                                      Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Project_Bonus                                       Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Performance_Bonus                                   Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Gross_Salary                                        Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Total_Deductions                                    Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Net_Salary                                          Decimal?                    @default(0.00) @db.Decimal(18, 2)
+  Currency                                            String?                     @default("IRR") @db.VarChar(10)
+  Total_Allowances                                    Decimal?                    @default(0) @db.Decimal(18, 2)
+  Insurance_Employee                                  Decimal?                    @default(0) @db.Decimal(18, 2)
+  Insurance_Employer                                  Decimal?                    @default(0) @db.Decimal(18, 2)
+  Tax_Amount                                          Decimal?                    @default(0) @db.Decimal(18, 2)
+  Status                                              PR_Monthly_Salary_Status?   @default(Draft)
+  Calculated_At                                       DateTime?                   @db.DateTime(0)
+  Approved_By                                         Int?
+  Approved_At                                         DateTime?                   @db.DateTime(0)
+  Paid_At                                             DateTime?                   @db.DateTime(0)
+  Payment_Reference                                   String?                     @db.VarChar(100)
+  Created_At                                          DateTime?                   @default(now()) @db.DateTime(0)
+  Updated_At                                          DateTime?                   @default(now()) @db.DateTime(0)
+  Personnel_PR_Monthly_Salary_Approved_ByToPersonnel  Personnel?                  @relation("PR_Monthly_Salary_Approved_ByToPersonnel", fields: [Approved_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Salary_Approver")
+  Personnel_PR_Monthly_Salary_Personnel_IDToPersonnel Personnel                   @relation("PR_Monthly_Salary_Personnel_IDToPersonnel", fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Salary_Personnel")
+  PR_Monthly_Salary_Details                           PR_Monthly_Salary_Details[]
+
+  @@unique([Personnel_ID, Salary_Year, Salary_Month], map: "UK_Salary_Personnel_Month")
+  @@index([Approved_By], map: "IX_PR_Salary_Approver")
+  @@index([Status], map: "IX_PR_Salary_Status")
+}
+
+model PR_Monthly_Salary_Details {
+  Detail_ID          Int                                   @id @default(autoincrement())
+  Salary_ID          Int
+  Detail_Type        PR_Monthly_Salary_Details_Detail_Type
+  Deduction_Type_ID  Int?
+  Bonus_Type_ID      Int?
+  Amount             Decimal                               @default(0.00) @db.Decimal(18, 2)
+  Description        String?                               @db.VarChar(255)
+  Created_At         DateTime?                             @default(now()) @db.DateTime(0)
+  PR_Bonus_Types     PR_Bonus_Types?                       @relation(fields: [Bonus_Type_ID], references: [Bonus_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_SalaryDetail_Bonus")
+  PR_Deduction_Types PR_Deduction_Types?                   @relation(fields: [Deduction_Type_ID], references: [Deduction_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_SalaryDetail_Deduction")
+  PR_Monthly_Salary  PR_Monthly_Salary                     @relation(fields: [Salary_ID], references: [Salary_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_SalaryDetail_Salary")
+
+  @@index([Bonus_Type_ID], map: "IX_PR_SalaryDetail_Bonus")
+  @@index([Deduction_Type_ID], map: "IX_PR_SalaryDetail_Deduction")
+  @@index([Salary_ID], map: "IX_PR_SalaryDetail_Salary")
+}
+
+model PR_Personnel_Finance {
+  Finance_ID                                             Int        @id @default(autoincrement())
+  Personnel_ID                                           Int
+  Effective_From                                         DateTime   @db.Date
+  Effective_To                                           DateTime?  @db.Date
+  Base_Hourly_Rate                                       Decimal    @default(0.00) @db.Decimal(18, 2)
+  Overtime_Multiplier                                    Decimal    @default(1.40) @db.Decimal(5, 2)
+  OffHours_Multiplier                                    Decimal    @default(1.80) @db.Decimal(5, 2)
+  Min_Weekly_Hours                                       Decimal    @default(44.00) @db.Decimal(5, 2)
+  Max_Weekly_Overtime                                    Decimal    @default(20.00) @db.Decimal(5, 2)
+  Holiday_Hour_Multiplier     Decimal? @default(0) @db.Decimal(5, 2)
+  Friday_Hour_Multiplier      Decimal? @default(0) @db.Decimal(5, 2)
+  Mission_Regular_Multiplier  Decimal? @default(0) @db.Decimal(5, 2)
+  Mission_Friday_Multiplier   Decimal? @default(0) @db.Decimal(5, 2)
+  Mission_Holiday_Multiplier  Decimal? @default(0) @db.Decimal(5, 2)
+  Commute_Amount                                         Decimal?   @default(0.00) @db.Decimal(18, 2)
+  Mission_Daily_Amount                                   Decimal?   @default(0.00) @db.Decimal(18, 2)
+  Currency                                               String?    @default("IRR") @db.VarChar(10)
+  Base_Monthly_Salary                                    Decimal    @default(0) @db.Decimal(18, 2)
+  Housing_Allowance                                      Decimal    @default(0) @db.Decimal(18, 2)
+  Food_Allowance                                         Decimal    @default(0) @db.Decimal(18, 2)
+  Child_Allowance                                        Decimal    @default(0) @db.Decimal(18, 2)
+  Is_Active                                              Boolean?   @default(true)
+  Week1_Max_Hours         Decimal? @default(0) @db.Decimal(5, 2)
+  Week1_Max_Overtime      Decimal? @default(0) @db.Decimal(5, 2)
+  Week2_Max_Hours         Decimal? @default(0) @db.Decimal(5, 2)
+  Week2_Max_Overtime      Decimal? @default(0) @db.Decimal(5, 2)
+  Week3_Max_Hours         Decimal? @default(0) @db.Decimal(5, 2)
+  Week3_Max_Overtime      Decimal? @default(0) @db.Decimal(5, 2)
+  Week4_Max_Hours         Decimal? @default(0) @db.Decimal(5, 2)
+  Week4_Max_Overtime      Decimal? @default(0) @db.Decimal(5, 2)
+  MonthEnd_Max_Hours      Decimal? @default(0) @db.Decimal(5, 2)
+  MonthEnd_Max_Overtime   Decimal? @default(0) @db.Decimal(5, 2)
+  Max_Friday_Hours_Month  Decimal? @default(0) @db.Decimal(5, 2)
+  Max_Holiday_Hours_Month Decimal? @default(0) @db.Decimal(5, 2)
+  Created_By                                             Int?
+  Created_At                                             DateTime?  @default(now()) @db.DateTime(0)
+  Updated_At                                             DateTime?  @default(now()) @db.DateTime(0)
+  Personnel_PR_Personnel_Finance_Created_ByToPersonnel   Personnel? @relation("PR_Personnel_Finance_Created_ByToPersonnel", fields: [Created_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Finance_Creator")
+  Personnel_PR_Personnel_Finance_Personnel_IDToPersonnel Personnel  @relation("PR_Personnel_Finance_Personnel_IDToPersonnel", fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Finance_Personnel")
+
+  @@unique([Personnel_ID, Effective_From], map: "UK_Personnel_Finance_Date")
+  @@index([Created_By], map: "FK_PR_Finance_Creator")
+  @@index([Is_Active], map: "IX_PR_Finance_Active")
+  @@index([Personnel_ID], map: "IX_PR_Finance_Personnel")
+}
+
+model PR_Project_Assignments {
+  Assignment_ID       Int         @id @default(autoincrement())
+  Project_ID          Int
+  Personnel_ID        Int
+  Assigned_From       DateTime    @db.Date
+  Assigned_To         DateTime?   @db.Date
+  Role_In_Project     String?     @db.VarChar(100)
+  Project_Hourly_Rate Decimal?    @db.Decimal(18, 2)
+  Is_Active           Boolean?    @default(true)
+  Created_At          DateTime?   @default(now()) @db.DateTime(0)
+  Personnel           Personnel   @relation(fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Assign_Personnel")
+  PR_Projects         PR_Projects @relation(fields: [Project_ID], references: [Project_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Assign_Project")
+
+  @@index([Personnel_ID], map: "IX_ProjAssign_Personnel")
+  @@index([Project_ID], map: "IX_ProjAssign_Project")
+}
+
+model PR_Projects {
+  Project_ID       Int      @id @default(autoincrement())
+  Project_Code     String   @unique @db.VarChar(30)
+  Project_Name     String   @db.VarChar(150)
+  Project_Leader_ID  Int?
+  Description      String?  @db.Text
+  
+  // تاریخ‌ها
+  Start_Date       DateTime? @db.Date        // تاریخ شروع
+  Golden_Date      DateTime? @db.Date        // تاریخ طلایی
+  End_Date         DateTime? @db.Date        // تاریخ پایان
+  Deadline_Date    DateTime? @db.Date        // تاریخ دیرکرد (حد نهایی)
+  
+  // درصد‌های پاداش/جریمه
+  Golden_Bonus_Percent  Decimal? @default(0) @db.Decimal(5, 2)
+  Delay_Penalty_Percent Decimal? @default(0) @db.Decimal(5, 2)
+  
+  Budget           Decimal  @default(0) @db.Decimal(18, 2)
+  Status           String   @default("Active") @db.VarChar(20)
+  
+  // پاداش نهایی محاسبه شده
+  Final_Bonus      Decimal? @db.Decimal(18, 2)
+  
+  Manager_Score    Decimal? @db.Decimal(5, 2)
+  Manager_Comment  String?  @db.VarChar(500)
+  Manager_ID       Int?
+  Created_By       Int?
+  Created_At       DateTime @default(now())
+  Updated_At       DateTime @updatedAt
+  
+  // روابط
+  PR_Daily_Reports                            PR_Daily_Reports[]
+  PR_Project_Assignments                      PR_Project_Assignments[]
+  Personnel                                   Personnel?               @relation(fields: [Created_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Project_Creator")
+  Personnel_PR_Projects_Manager_IDToPersonnel Personnel?               @relation("PR_Projects_Manager_IDToPersonnel", fields: [Manager_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Projects_Manager")
+ Project_Leader Personnel? @relation("ProjectLeader", fields: [Project_Leader_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Project_Leader")
+
+  @@index([Created_By], map: "FK_Project_Creator")
+  @@index([Manager_ID], map: "FK_PR_Projects_Manager")
+  @@map("PR_Projects")
+}
+
+model PR_Work_Locations {
+  Location_ID      Int                @id @default(autoincrement())
+  Location_Code    String             @unique(map: "UK_Location_Code") @db.VarChar(30)
+  Location_Name    String             @db.VarChar(150)
+  Location_Type    String?            @db.VarChar(50)
+  Address          String?            @db.VarChar(255)
+  Is_Active        Boolean?           @default(true)
+  Created_At       DateTime?          @default(now()) @db.DateTime(0)
+  PR_Daily_Reports PR_Daily_Reports[]
+}
+
+model PR_Work_Types {
+  Work_Type_ID     Int                @id @default(autoincrement())
+  Work_Type_Code   String             @unique(map: "UK_Work_Type_Code") @db.VarChar(30)
+  Work_Type_Name   String             @db.VarChar(100)
+  Description      String?            @db.Text
+  Is_Active        Boolean?           @default(true)
+  Created_At       DateTime?          @default(now()) @db.DateTime(0)
+  PR_Daily_Reports PR_Daily_Reports[]
+}
+
+model PR_Tasks {
+  Task_ID     Int       @id @default(autoincrement())
+  Assigned_To Int // Personnel_ID
+  Assigned_By Int // Manager ID (User ID)
+  Title       String    @db.VarChar(255)
+  Description String?   @db.Text
+  Due_Date    DateTime? @db.Date
+  Status      String    @default("Pending") @db.VarChar(20) // Pending, In_Progress, Done, Rejected
+  Priority    String    @default("Normal") @db.VarChar(20) // Low, Normal, High, Urgent
+  Created_At  DateTime  @default(now())
+  Updated_At  DateTime  @updatedAt
+
+  // روابط
+  Personnel_AssignedTo Personnel @relation("TaskAssignee", fields: [Assigned_To], references: [Personnel_ID])
+
+  @@index([Assigned_To])
+  @@index([Assigned_By])
+}
+
+model PR_Payroll_Settings {
+  Setting_ID                  Int      @id @default(1) // همیشه 1 است (تنظیمات کلی)
+  
+  // بخش ۱: نرخ‌های ساعتی
+  Base_Regular_Hourly_Rate    Decimal  @default(0) @db.Decimal(18, 2) // مبلغ پایه روز عادی
+  Holiday_Hour_Multiplier     Decimal  @default(0) @db.Decimal(5, 2)  // درصد اضافه کاری تعطیل
+  Friday_Hour_Multiplier      Decimal  @default(0) @db.Decimal(5, 2)  // درصد اضافه کاری جمعه
+  Mission_Regular_Multiplier  Decimal  @default(0) @db.Decimal(5, 2)  // درصد ماموریت روز عادی
+  Mission_Friday_Multiplier   Decimal  @default(0) @db.Decimal(5, 2)  // درصد ماموریت جمعه
+  Mission_Holiday_Multiplier  Decimal  @default(0) @db.Decimal(5, 2)  // درصد ماموریت تعطیل
+  
+  // بخش ۲: ساعات مجاز و اضافه کاری (هفته ۱ تا ۴)
+  Week1_Max_Hours             Decimal  @default(0) @db.Decimal(5, 2)
+  Week1_Max_Overtime          Decimal  @default(0) @db.Decimal(5, 2)
+  Week2_Max_Hours             Decimal  @default(0) @db.Decimal(5, 2)
+  Week2_Max_Overtime          Decimal  @default(0) @db.Decimal(5, 2)
+  Week3_Max_Hours             Decimal  @default(0) @db.Decimal(5, 2)
+  Week3_Max_Overtime          Decimal  @default(0) @db.Decimal(5, 2)
+  Week4_Max_Hours             Decimal  @default(0) @db.Decimal(5, 2)
+  Week4_Max_Overtime          Decimal  @default(0) @db.Decimal(5, 2)
+  
+  // روزهای آخر ماه
+  MonthEnd_Max_Hours          Decimal  @default(0) @db.Decimal(5, 2)
+  MonthEnd_Max_Overtime       Decimal  @default(0) @db.Decimal(5, 2)
+  Delay_Penalty_Percent      Decimal? @default(0) @db.Decimal(5, 2) 
+  
+  // ساعات مجاز جمعه و تعطیل در ماه
+  Max_Friday_Hours_Month      Decimal  @default(0) @db.Decimal(5, 2)
+  Max_Holiday_Hours_Month     Decimal  @default(0) @db.Decimal(5, 2)
+  
+  Updated_At                  DateTime @updatedAt
+}
+
+model Personnel {
+  Personnel_ID                                                      Int                        @id @default(autoincrement())
+  Personnel_Code                                                    String                     @unique(map: "Personnel_Code") @db.VarChar(20)
+  Full_Name                                                         String                     @db.VarChar(100)
+  National_Code                                                     String?                    @db.VarChar(20)
+  Role                                                              Personnel_Role
+  Line_ID                                                           Int?
+  Hire_Date                                                         DateTime?                  @db.Date
+  Department                                                        String?                    @db.VarChar(100)
+  Bank_Account                                                      String?                    @db.VarChar(50)
+  Bank_Name                                                         String?                    @db.VarChar(100)
+  Marital_Status                                                    Personnel_Marital_Status?  @default(Single)
+  Children_Count                                                    Int?                       @default(0)
+  Employment_Type                                                   Personnel_Employment_Type? @default(Contractual)
+  Personal_Image_Path                                               String?                    @db.VarChar(500)
+  IsActive                                                          Boolean?                   @default(true)
+  PR_Commute_Logs_PR_Commute_Logs_Approved_ByToPersonnel            PR_Commute_Logs[]          @relation("PR_Commute_Logs_Approved_ByToPersonnel")
+  PR_Commute_Logs_PR_Commute_Logs_Personnel_IDToPersonnel           PR_Commute_Logs[]          @relation("PR_Commute_Logs_Personnel_IDToPersonnel")
+  PR_Daily_Reports_PR_Daily_Reports_Manager_IDToPersonnel           PR_Daily_Reports[]         @relation("PR_Daily_Reports_Manager_IDToPersonnel")
+  PR_Daily_Reports_PR_Daily_Reports_Personnel_IDToPersonnel         PR_Daily_Reports[]         @relation("PR_Daily_Reports_Personnel_IDToPersonnel")
+  PR_Leave_Requests_PR_Leave_Requests_Approved_ByToPersonnel        PR_Leave_Requests[]        @relation("PR_Leave_Requests_Approved_ByToPersonnel")
+  PR_Leave_Requests_PR_Leave_Requests_Personnel_IDToPersonnel       PR_Leave_Requests[]        @relation("PR_Leave_Requests_Personnel_IDToPersonnel")
+  PR_Manager_Approvals                                              PR_Manager_Approvals[]
+  PR_Monthly_Salary_PR_Monthly_Salary_Approved_ByToPersonnel        PR_Monthly_Salary[]        @relation("PR_Monthly_Salary_Approved_ByToPersonnel")
+  PR_Monthly_Salary_PR_Monthly_Salary_Personnel_IDToPersonnel       PR_Monthly_Salary[]        @relation("PR_Monthly_Salary_Personnel_IDToPersonnel")
+  PR_Personnel_Finance_PR_Personnel_Finance_Created_ByToPersonnel   PR_Personnel_Finance[]     @relation("PR_Personnel_Finance_Created_ByToPersonnel")
+  PR_Personnel_Finance_PR_Personnel_Finance_Personnel_IDToPersonnel PR_Personnel_Finance[]     @relation("PR_Personnel_Finance_Personnel_IDToPersonnel")
+  PR_Project_Assignments                                            PR_Project_Assignments[]
+  PR_Projects                                                       PR_Projects[]
+  PR_Projects_PR_Projects_Manager_IDToPersonnel                     PR_Projects[]              @relation("PR_Projects_Manager_IDToPersonnel")
+  Production_Lines                                                  Production_Lines?          @relation(fields: [Line_ID], references: [Line_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Personnel_ProductionLines")
+  Personnel_Hourly_Rates                                            Personnel_Hourly_Rates[]
+  Supervisor_Machines                                               Supervisor_Machines[]
+  TPM_Checklist_Responses                                           TPM_Checklist_Responses[]
+  Users                                                             Users[]
+  WO_Action_Log                                                     WO_Action_Log[]
+  Work_Orders_Work_Orders_Requester_IDToPersonnel                   Work_Orders[]              @relation("Work_Orders_Requester_IDToPersonnel")
+  Work_Orders_Work_Orders_Supervisor_IDToPersonnel                  Work_Orders[]              @relation("Work_Orders_Supervisor_IDToPersonnel")
+  Work_Orders_Work_Orders_Technician_IDToPersonnel                  Work_Orders[]              @relation("Work_Orders_Technician_IDToPersonnel")
+  Work_Orders_Archive_Work_Orders_Archive_Requester_IDToPersonnel   Work_Orders_Archive[]      @relation("Work_Orders_Archive_Requester_IDToPersonnel")
+  Work_Orders_Archive_Work_Orders_Archive_Supervisor_IDToPersonnel  Work_Orders_Archive[]      @relation("Work_Orders_Archive_Supervisor_IDToPersonnel")
+  Work_Orders_Archive_Work_Orders_Archive_Technician_IDToPersonnel  Work_Orders_Archive[]      @relation("Work_Orders_Archive_Technician_IDToPersonnel")
+  Tasks_AssignedTo                                                  PR_Tasks[]                 @relation("TaskAssignee")
+
+  Led_Projects PR_Projects[] @relation("ProjectLeader")
+
+  @@index([Line_ID], map: "IX_Personnel_LineID")
+  @@index([Role], map: "IX_Personnel_Role")
+}
+
+model Personnel_Hourly_Rates {
+  Rate_ID        Int       @id @default(autoincrement())
+  Personnel_ID   Int
+  Effective_From DateTime  @db.Date
+  Effective_To   DateTime? @db.Date
+  Hourly_Rate    Decimal   @db.Decimal(18, 2)
+  Currency       String?   @default("IRR") @db.VarChar(10)
+  Is_Active      Boolean?  @default(true)
+  Created_At     DateTime? @default(now()) @db.DateTime(0)
+  Personnel      Personnel @relation(fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Rates_Personnel")
+
+  @@unique([Personnel_ID, Effective_From], map: "UK_Personnel_Date")
+  @@index([Is_Active], map: "IX_Personnel_Rates_Active")
+  @@index([Personnel_ID], map: "IX_Personnel_Rates_Personnel")
+}
+
+model Production_Lines {
+  Line_ID    Int         @id @default(autoincrement())
+  Line_Code  String      @unique(map: "Line_Code") @db.VarChar(20)
+  Line_Name  String      @db.VarChar(100)
+  Plant_Name String?     @db.VarChar(100)
+  IsActive   Boolean?    @default(true)
+  Machines   Machines[]
+  Personnel  Personnel[]
+}
+
+model Repair_Types {
+  Repair_Type_ID      Int                   @id @default(autoincrement())
+  Repair_Type_Code    String                @unique(map: "Repair_Type_Code") @db.VarChar(20)
+  Repair_Type_Name    String                @db.VarChar(100)
+  Description         String?               @db.Text
+  Min_Price           Decimal               @db.Decimal(18, 2)
+  Max_Price           Decimal               @db.Decimal(18, 2)
+  Difficulty_Level    Int
+  Estimated_Hours     Decimal?              @default(1.00) @db.Decimal(8, 2)
+  IsActive            Boolean?              @default(true)
+  Created_At          DateTime?             @default(now()) @db.DateTime(0)
+  WO_Repair_Types     WO_Repair_Types[]
+  Work_Orders         Work_Orders[]
+  Work_Orders_Archive Work_Orders_Archive[]
+
+  @@index([IsActive], map: "IX_Repair_Type_Active")
+  @@index([Repair_Type_Code], map: "IX_Repair_Type_Code")
+}
+
+model Spare_Parts {
+  Part_ID               Int                     @id @default(autoincrement())
+  Part_Code             String                  @unique(map: "Part_Code") @db.VarChar(50)
+  Part_Name             String                  @db.VarChar(150)
+  Unit_Of_Measure       String?                 @db.VarChar(20)
+  Current_Stock         Int?                    @default(0)
+  Min_Stock_Level       Int?                    @default(0)
+  Unit_Price            Decimal?                @default(0.00) @db.Decimal(18, 2)
+  Currency              String?                 @default("IRR") @db.VarChar(10)
+  IsActive              Boolean?                @default(true)
+  Equipment_Spare_Parts Equipment_Spare_Parts[]
+  WO_Spare_Used         WO_Spare_Used[]
+  WO_Spare_Used_Archive WO_Spare_Used_Archive[]
+}
+
+model Supervisor_Machines {
+  SM_ID         Int       @id @default(autoincrement())
+  Supervisor_ID Int
+  Machine_ID    Int
+  Assigned_Date DateTime  @db.Date
+  Is_Active     Boolean?  @default(true)
+  Machines      Machines  @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_SM_Machine")
+  Personnel     Personnel @relation(fields: [Supervisor_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_SM_Supervisor")
+
+  @@unique([Supervisor_ID, Machine_ID], map: "UK_Supervisor_Machine")
+  @@index([Machine_ID], map: "Machine_ID")
+}
+
+model TPM_Checklist_Responses {
+  Response_ID             Int                     @id @default(autoincrement())
+  Template_ID             Int
+  Operator_ID             Int
+  Response_Date           DateTime                @default(now()) @db.DateTime(0)
+  Is_OK                   Boolean
+  Actual_Value            String?                 @db.VarChar(100)
+  Observation             String?                 @db.VarChar(500)
+  Created_WO_ID           Int?
+  Personnel               Personnel               @relation(fields: [Operator_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_TPMR_Operator")
+  TPM_Checklist_Templates TPM_Checklist_Templates @relation(fields: [Template_ID], references: [Template_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_TPMR_Template")
+  Work_Orders             Work_Orders?            @relation(fields: [Created_WO_ID], references: [WO_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_TPMR_WO")
+
+  @@index([Created_WO_ID], map: "Created_WO_ID")
+  @@index([Response_Date], map: "IX_TPM_Response_Date")
+  @@index([Template_ID, Response_Date], map: "IX_TPM_Response_Template")
+  @@index([Operator_ID], map: "Operator_ID")
+}
+
+model TPM_Checklist_Templates {
+  Template_ID             Int                               @id @default(autoincrement())
+  Machine_ID              Int
+  Check_Item              String                            @db.VarChar(250)
+  Frequency               TPM_Checklist_Templates_Frequency @default(Daily)
+  Standard_Value          String?                           @db.VarChar(100)
+  IsActive                Boolean?                          @default(true)
+  TPM_Checklist_Responses TPM_Checklist_Responses[]
+  Machines                Machines                          @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_TPMT_Machine")
+
+  @@index([Machine_ID, Frequency], map: "IX_TPM_Template_Machine_Freq")
+}
+
+model Users {
+  User_ID      Int        @id @default(autoincrement())
+  Personnel_ID Int?
+  Username     String     @unique(map: "Username") @db.VarChar(50)
+  PasswordHash String     @db.VarChar(255)
+  IsActive     Boolean?   @default(true)
+  Created_At   DateTime?  @default(now()) @db.DateTime(0)
+  Last_Login   DateTime?  @db.DateTime(0)
+  Personnel    Personnel? @relation(fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Users_Personnel")
+
+  @@index([Personnel_ID], map: "Personnel_ID")
+}
+
+model PR_Holidays {
+  Holiday_ID  Int      @id @default(autoincrement())
+  Date        DateTime @unique @db.Date
+  Description String?  @db.VarChar(255)
+  Created_At  DateTime @default(now())
+}
+
+model WO_Action_Log {
+  Log_ID      Int                       @id @default(autoincrement())
+  WO_ID       Int
+  Action_Time DateTime                  @default(now()) @db.DateTime(0)
+  Actor_ID    Int
+  Action_Type WO_Action_Log_Action_Type
+  From_Status String?                   @db.VarChar(30)
+  To_Status   String?                   @db.VarChar(30)
+  Action_Note String?                   @db.Text
+  Personnel   Personnel                 @relation(fields: [Actor_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_AL_Actor")
+  Work_Orders Work_Orders               @relation(fields: [WO_ID], references: [WO_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_AL_WO")
+
+  @@index([Actor_ID], map: "Actor_ID")
+  @@index([From_Status], map: "From_Status")
+  @@index([Action_Time], map: "IX_Action_Log_Date")
+  @@index([WO_ID], map: "IX_Action_Log_WO_ID")
+  @@index([To_Status], map: "To_Status")
+}
+
+model WO_Repair_Types {
+  WO_RT_ID           Int          @id @default(autoincrement())
+  WO_ID              Int
+  Repair_Type_ID     Int
+  Difficulty_Applied Int?         @default(1)
+  Applied_Price      Decimal      @db.Decimal(18, 2)
+  Hours_Spent        Decimal?     @default(0.00) @db.Decimal(8, 2)
+  Note               String?      @db.Text
+  Repair_Types       Repair_Types @relation(fields: [Repair_Type_ID], references: [Repair_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WORT_RepairType")
+  Work_Orders        Work_Orders  @relation(fields: [WO_ID], references: [WO_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WORT_WO")
+
+  @@unique([WO_ID, Repair_Type_ID], map: "UK_WO_RepairType")
+  @@index([Repair_Type_ID], map: "IX_WO_Repair_Types_Type")
+  @@index([WO_ID], map: "IX_WO_Repair_Types_WO")
+}
+
+model WO_Spare_Used {
+  WO_SU_ID      Int         @id @default(autoincrement())
+  WO_ID         Int
+  Part_ID       Int
+  Quantity_Used Int
+  Unit_Price    Decimal     @db.Decimal(18, 2)
+  Total_Price   Decimal?    @db.Decimal(18, 2)
+  Used_At       DateTime?   @default(now()) @db.DateTime(0)
+  Spare_Parts   Spare_Parts @relation(fields: [Part_ID], references: [Part_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOSU_Part")
+  Work_Orders   Work_Orders @relation(fields: [WO_ID], references: [WO_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOSU_WO")
+
+  @@index([Part_ID], map: "IX_Spare_Used_Part")
+  @@index([WO_ID], map: "IX_Spare_Used_WO")
+}
+
+model WO_Spare_Used_Archive {
+  WO_SU_ID      Int         @id
+  WO_ID         Int
+  Part_ID       Int
+  Quantity_Used Int
+  Unit_Price    Decimal     @db.Decimal(18, 2)
+  Total_Price   Decimal?    @db.Decimal(18, 2)
+  Used_At       DateTime?   @default(now()) @db.DateTime(0)
+  Archived_At   DateTime?   @default(now()) @db.DateTime(0)
+  Spare_Parts   Spare_Parts @relation(fields: [Part_ID], references: [Part_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOSUA_Part")
+  Work_Orders   Work_Orders @relation(fields: [WO_ID], references: [WO_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOSUA_WO")
+
+  @@index([Part_ID], map: "Part_ID")
+  @@index([WO_ID], map: "WO_ID")
+}
+
+model WO_Statuses {
+  Status_Code     String                      @id @db.VarChar(30)
+  Status_Name     String                      @db.VarChar(50)
+  Status_Category WO_Statuses_Status_Category @default(In_progress)
+  IsTerminal      Boolean?                    @default(false)
+}
+
+model Work_Orders {
+  WO_ID                                          Int                       @id @default(autoincrement())
+  WO_Number                                      String                    @unique(map: "WO_Number") @db.VarChar(20)
+  Machine_ID                                     Int
+  Equipment_ID                                   Int?
+  Strategy_ID                                    Int
+  Failure_ID                                     Int?
+  Repair_Type_ID                                 Int?
+  Requester_ID                                   Int
+  Supervisor_ID                                  Int
+  Technician_ID                                  Int?
+  Contractor_ID                                  Int?
+  Status_Code                                    String                    @default("Awaiting approval") @db.VarChar(30)
+  Rejection_Reason                               String?                   @db.Text
+  Problem_Description                            String                    @db.Text
+  Solution_Description                           String?                   @db.Text
+  Production_Feedback                            String?                   @db.Text
+  Request_Time                                   DateTime                  @default(now()) @db.DateTime(0)
+  Assigned_Time                                  DateTime?                 @db.DateTime(0)
+  Contractor_Response_Time                       DateTime?                 @db.DateTime(0)
+  Breakdown_Start_Time                           DateTime?                 @db.DateTime(0)
+  Breakdown_End_Time                             DateTime?                 @db.DateTime(0)
+  Repair_Start_Time                              DateTime?                 @db.DateTime(0)
+  Repair_End_Time                                DateTime?                 @db.DateTime(0)
+  Machine_Restart_Time                           DateTime?                 @db.DateTime(0)
+  Due_Date                                       DateTime?                 @db.DateTime(0)
+  Work_Difficulty                                Int?                      @default(1)
+  Actual_Hours                                   Decimal?                  @db.Decimal(8, 2)
+  Labor_Cost                                     Decimal?                  @default(0.00) @db.Decimal(18, 2)
+  Spare_Cost                                     Decimal?                  @default(0.00) @db.Decimal(18, 2)
+  Repair_Type_Cost                               Decimal?                  @default(0.00) @db.Decimal(18, 2)
+  Contractor_Cost                                Decimal?                  @default(0.00) @db.Decimal(18, 2)
+  Total_Cost                                     Decimal?                  @default(0.00) @db.Decimal(18, 2)
+  Currency                                       String?                   @default("IRR") @db.VarChar(10)
+  Is_First_Time_Fix                              Boolean?
+  Is_Operator_Assisted                           Boolean?                  @default(false)
+  Created_At                                     DateTime?                 @default(now()) @db.DateTime(0)
+  Updated_At                                     DateTime?                 @default(now()) @db.DateTime(0)
+  TPM_Checklist_Responses                        TPM_Checklist_Responses[]
+  WO_Action_Log                                  WO_Action_Log[]
+  WO_Repair_Types                                WO_Repair_Types[]
+  WO_Spare_Used                                  WO_Spare_Used[]
+  WO_Spare_Used_Archive                          WO_Spare_Used_Archive[]
+  Contractors                                    Contractors?              @relation(fields: [Contractor_ID], references: [Contractor_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Contractor")
+  Equipment                                      Equipment?                @relation(fields: [Equipment_ID], references: [Equipment_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Equipment")
+  Failure_Codes                                  Failure_Codes?            @relation(fields: [Failure_ID], references: [Failure_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Failure")
+  Machines                                       Machines                  @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Machine")
+  Repair_Types                                   Repair_Types?             @relation(fields: [Repair_Type_ID], references: [Repair_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_RepairType")
+  Personnel_Work_Orders_Requester_IDToPersonnel  Personnel                 @relation("Work_Orders_Requester_IDToPersonnel", fields: [Requester_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Requester")
+  Maintenance_Strategies                         Maintenance_Strategies    @relation(fields: [Strategy_ID], references: [Strategy_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Strategy")
+  Personnel_Work_Orders_Supervisor_IDToPersonnel Personnel                 @relation("Work_Orders_Supervisor_IDToPersonnel", fields: [Supervisor_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Supervisor")
+  Personnel_Work_Orders_Technician_IDToPersonnel Personnel?                @relation("Work_Orders_Technician_IDToPersonnel", fields: [Technician_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Technician")
+
+  @@index([Equipment_ID], map: "Equipment_ID")
+  @@index([Failure_ID], map: "Failure_ID")
+  @@index([Contractor_ID], map: "IX_WO_Contractor_ID")
+  @@index([Machine_ID], map: "IX_WO_Machine_ID")
+  @@index([Repair_Type_ID], map: "IX_WO_Repair_Type")
+  @@index([Request_Time], map: "IX_WO_Request_Time")
+  @@index([Status_Code, Created_At], map: "IX_WO_Status_Created")
+  @@index([Status_Code, Strategy_ID], map: "IX_WO_Status_Strategy")
+  @@index([Supervisor_ID], map: "IX_WO_Supervisor_ID")
+  @@index([Total_Cost], map: "IX_WO_Total_Cost")
+  @@index([Requester_ID], map: "Requester_ID")
+  @@index([Strategy_ID], map: "Strategy_ID")
+  @@index([Technician_ID], map: "Technician_ID")
+}
+
+model Work_Orders_Archive {
+  WO_ID                                                  Int                    @id
+  WO_Number                                              String                 @unique(map: "WO_Number") @db.VarChar(20)
+  Machine_ID                                             Int
+  Equipment_ID                                           Int?
+  Strategy_ID                                            Int
+  Failure_ID                                             Int?
+  Repair_Type_ID                                         Int?
+  Requester_ID                                           Int
+  Supervisor_ID                                          Int
+  Technician_ID                                          Int?
+  Contractor_ID                                          Int?
+  Status_Code                                            String                 @default("Awaiting approval") @db.VarChar(30)
+  Rejection_Reason                                       String?                @db.Text
+  Problem_Description                                    String                 @db.Text
+  Solution_Description                                   String?                @db.Text
+  Production_Feedback                                    String?                @db.Text
+  Request_Time                                           DateTime               @default(now()) @db.DateTime(0)
+  Assigned_Time                                          DateTime?              @db.DateTime(0)
+  Contractor_Response_Time                               DateTime?              @db.DateTime(0)
+  Breakdown_Start_Time                                   DateTime?              @db.DateTime(0)
+  Breakdown_End_Time                                     DateTime?              @db.DateTime(0)
+  Repair_Start_Time                                      DateTime?              @db.DateTime(0)
+  Repair_End_Time                                        DateTime?              @db.DateTime(0)
+  Machine_Restart_Time                                   DateTime?              @db.DateTime(0)
+  Due_Date                                               DateTime?              @db.DateTime(0)
+  Work_Difficulty                                        Int?                   @default(1)
+  Actual_Hours                                           Decimal?               @db.Decimal(8, 2)
+  Labor_Cost                                             Decimal?               @default(0.00) @db.Decimal(18, 2)
+  Spare_Cost                                             Decimal?               @default(0.00) @db.Decimal(18, 2)
+  Repair_Type_Cost                                       Decimal?               @default(0.00) @db.Decimal(18, 2)
+  Contractor_Cost                                        Decimal?               @default(0.00) @db.Decimal(18, 2)
+  Total_Cost                                             Decimal?               @default(0.00) @db.Decimal(18, 2)
+  Currency                                               String?                @default("IRR") @db.VarChar(10)
+  Is_First_Time_Fix                                      Boolean?
+  Is_Operator_Assisted                                   Boolean?               @default(false)
+  Created_At                                             DateTime?              @default(now()) @db.DateTime(0)
+  Updated_At                                             DateTime?              @default(now()) @db.DateTime(0)
+  Archived_At                                            DateTime?              @default(now()) @db.DateTime(0)
+  Contractors                                            Contractors?           @relation(fields: [Contractor_ID], references: [Contractor_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Contractor")
+  Equipment                                              Equipment?             @relation(fields: [Equipment_ID], references: [Equipment_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Equipment")
+  Failure_Codes                                          Failure_Codes?         @relation(fields: [Failure_ID], references: [Failure_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Failure")
+  Machines                                               Machines               @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Machine")
+  Repair_Types                                           Repair_Types?          @relation(fields: [Repair_Type_ID], references: [Repair_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_RepairType")
+  Personnel_Work_Orders_Archive_Requester_IDToPersonnel  Personnel              @relation("Work_Orders_Archive_Requester_IDToPersonnel", fields: [Requester_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Requester")
+  Maintenance_Strategies                                 Maintenance_Strategies @relation(fields: [Strategy_ID], references: [Strategy_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Strategy")
+  Personnel_Work_Orders_Archive_Supervisor_IDToPersonnel Personnel              @relation("Work_Orders_Archive_Supervisor_IDToPersonnel", fields: [Supervisor_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Supervisor")
+  Personnel_Work_Orders_Archive_Technician_IDToPersonnel Personnel?             @relation("Work_Orders_Archive_Technician_IDToPersonnel", fields: [Technician_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Technician")
+
+  @@index([Contractor_ID], map: "Contractor_ID")
+  @@index([Equipment_ID], map: "Equipment_ID")
+  @@index([Failure_ID], map: "Failure_ID")
+  @@index([Machine_ID], map: "Machine_ID")
+  @@index([Repair_Type_ID], map: "Repair_Type_ID")
+  @@index([Requester_ID], map: "Requester_ID")
+  @@index([Status_Code], map: "Status_Code")
+  @@index([Strategy_ID], map: "Strategy_ID")
+  @@index([Supervisor_ID], map: "Supervisor_ID")
+  @@index([Technician_ID], map: "Technician_ID")
+}
+
+enum PR_Monthly_Salary_Details_Detail_Type {
+  Deduction
+  Bonus
+  Other
+}
+
+enum WO_Statuses_Status_Category {
+  Pending_approval @map("Pending approval")
+  In_progress      @map("In progress")
+  Done
+  Rejected
+}
+
+enum PR_Commute_Logs_Commute_Type {
+  CompanyVehicle
+  PersonalVehicle
+  PublicTransport
+  Taxi
+  Other
+}
+
+enum PR_Commute_Logs_Status {
+  Pending
+  InProgress
+  Completed
+  Rejected
+}
+
+enum TPM_Checklist_Templates_Frequency {
+  Daily
+  Weekly
+  Monthly
+}
+
+enum Machine_Runtime_Log_Log_Type {
+  On
+  Off
+}
+
+enum Personnel_Role {
+  Production_Supervisor @map("Production Supervisor")
+  Factory_Manager       @map("Factory Manager")
+  ModirNet
+  Repairer
+  Operator
+  Commerce
+  Contractor
+}
+
+enum WO_Action_Log_Action_Type {
+  verification
+  Reject
+}
+
+enum Equipment_Criticality_Level {
+  Vital
+  important
+  Normal
+}
+
+enum PR_Manager_Approvals_Approval_Status {
+  Pending
+  Approved
+  Rejected
+  Needs_Revision
+}
+
+enum PR_Leave_Requests_Status {
+  Pending
+  Approved
+  Rejected
+  Cancelled
+}
+
+enum PR_Projects_Status {
+  Active
+  Completed
+  Cancelled
+  OnHold
+}
+
+enum Machines_Criticality_Level {
+  Vital
+  important
+  Normal
+}
+
+enum Machines_Machine_Status {
+  In_progress    @map("In progress")
+  Ready_for_work @map("Ready for work")
+  Broked
+  Under_Repair   @map("Under Repair")
+}
+
+enum Personnel_Marital_Status {
+  Single
+  Married
+}
+
+enum Personnel_Employment_Type {
+  Official
+  Contractual
+  PartTime
+  Intern
+}
+
+enum PR_Daily_Reports_Commute_Status {
+  CompanyVehicle
+  PersonalVehicle
+  PublicTransport
+  None
+}
+
+enum PR_Daily_Reports_Report_Status {
+  Draft
+  Submitted
+  Manager_Reviewed
+  Finance_Processed
+  Rejected
+}
+
+enum PR_Monthly_Salary_Status {
+  Draft
+  Calculated
+  Approved
+  Paid
+  Archived
+}

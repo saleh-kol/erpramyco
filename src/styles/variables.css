@@ -1,0 +1,9 @@
+:root {
+  --color-primary: #ee6f2c;
+  --color-primary-dark: #ba451b;
+  --color-bg: #f8f9fa;
+  --color-sidebar: #ffffff;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --sidebar-width: 280px;
+}
