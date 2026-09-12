@@ -1,77 +1,268 @@
 "use client";
 
 import { useState } from "react";
-import { addWorkTypeAction, deleteWorkTypeAction, addLocationAction, deleteLocationAction } from "@/actions/activitySettings";
-import { Plus, Trash2, Briefcase, MapPin, CheckCircle } from "lucide-react";
 
-export default function ActivitySettingsClient({ types, locations }: { types: any[], locations: any[] }) {
+import {
+  addWorkTypeAction,
+  deleteWorkTypeAction,
+  addLocationAction,
+  deleteLocationAction,
+} from "@/actions/activitySettings";
+
+import {
+  Plus,
+  Trash2,
+  Briefcase,
+  MapPin,
+  CheckCircle,
+} from "lucide-react";
+
+export default function ActivitySettingsClient({
+  types,
+  locations,
+}: {
+  types: any[];
+  locations: any[];
+}) {
   const [toast, setToast] = useState<string | null>(null);
 
-  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+  const showToast = (message: string) => {
+    setToast(message);
 
-  const cardStyle: React.CSSProperties = { backgroundColor: "white", borderRadius: "16px", border: "1px solid #e2e8f0", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" };
-  const inputStyle: React.CSSProperties = { width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0", outline: "none", fontSize: "14px", backgroundColor: "#f8fafc", boxSizing: "border-box" };
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
 
   return (
-    <div style={{ backgroundColor: "#f1f5f9", minHeight: "100vh", padding: "24px" }}>
-      <style>{`@keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }`}</style>
+    <div className="min-h-[calc(100vh-128px)] bg-slate-50 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1400px]">
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-        
-        {/* مدیریت انواع فعالیت */}
-        <div style={cardStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px" }}>
-            <Briefcase style={{ width: "20px", height: "20px", color: "#ed6e2b" }} />
-            <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>انواع فعالیت‌ها</h2>
-          </div>
-          
-          <form action={addWorkTypeAction} onSubmit={() => showToast("نوع فعالیت اضافه شد")} style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-            <input name="name" required type="text" style={inputStyle} placeholder="نام نوع فعالیت جدید..." />
-            <button type="submit" style={{ padding: "10px 16px", backgroundColor: "#ed6e2b", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "4px" }}><Plus style={{ width: "16px" }} /></button>
-          </form>
+        {/* Header */}
+        <div className="mb-7">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50">
+              <Briefcase className="h-4 w-4 text-[#ed6e2b]" />
+            </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {types.map((t: any) => (
-              <div key={t.Work_Type_ID} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", backgroundColor: "#f8fafc", borderRadius: "8px" }}>
-                <span style={{ fontSize: "14px", color: "#334155" }}>{t.Work_Type_Name}</span>
-                <form action={deleteWorkTypeAction} onSubmit={() => showToast("حذف شد")}>
-                  <input type="hidden" name="id" value={t.Work_Type_ID} />
-                  <button type="submit" style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef4444" }}><Trash2 style={{ width: "16px" }} /></button>
-                </form>
-              </div>
-            ))}
+            <span className="text-xs font-semibold text-slate-400">
+              تنظیمات سامانه
+            </span>
           </div>
+
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+            تنظیمات فعالیت‌ها
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-500">
+            انواع فعالیت و محل‌های قابل استفاده در ثبت فعالیت کارکنان را مدیریت کنید.
+          </p>
         </div>
 
-        {/* مدیریت محله‌های فعالیت */}
-        <div style={cardStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "20px" }}>
-            <MapPin style={{ width: "20px", height: "20px", color: "#ed6e2b" }} />
-            <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>محله‌های فعالیت</h2>
-          </div>
-          
-          <form action={addLocationAction} onSubmit={() => showToast("محل فعالیت اضافه شد")} style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-            <input name="name" required type="text" style={inputStyle} placeholder="نام محل فعالیت جدید..." />
-            <button type="submit" style={{ padding: "10px 16px", backgroundColor: "#ed6e2b", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "4px" }}><Plus style={{ width: "16px" }} /></button>
-          </form>
+        {/* Main */}
+        <div className="grid gap-6 lg:grid-cols-2">
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {locations.map((l: any) => (
-              <div key={l.Location_ID} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", backgroundColor: "#f8fafc", borderRadius: "8px" }}>
-                <span style={{ fontSize: "14px", color: "#334155" }}>{l.Location_Name}</span>
-                <form action={deleteLocationAction} onSubmit={() => showToast("حذف شد")}>
-                  <input type="hidden" name="id" value={l.Location_ID} />
-                  <button type="submit" style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef4444" }}><Trash2 style={{ width: "16px" }} /></button>
-                </form>
+          {/* Work Types */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+            <div className="border-b border-slate-100 p-5 sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50">
+                  <Briefcase className="h-5 w-5 text-[#ed6e2b]" />
+                </div>
+
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900">
+                    انواع فعالیت‌ها
+                  </h2>
+
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {types.length} نوع فعالیت ثبت شده
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
+            </div>
+
+            <div className="p-5 sm:p-6">
+
+              {/* Add */}
+              <form
+                action={addWorkTypeAction}
+                onSubmit={() => showToast("نوع فعالیت اضافه شد")}
+                className="mb-5 flex gap-2"
+              >
+                <input
+                  name="name"
+                  required
+                  type="text"
+                  placeholder="نام نوع فعالیت جدید..."
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-[#ed6e2b] focus:bg-white focus:ring-4 focus:ring-orange-100"
+                />
+
+                <button
+                  type="submit"
+                  aria-label="افزودن نوع فعالیت"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ed6e2b] text-white shadow-sm shadow-orange-200 transition-all hover:bg-[#d95f20] hover:shadow-md active:scale-95"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </form>
+
+              {/* List */}
+              <div className="space-y-2">
+                {types.length > 0 ? (
+                  types.map((type: any) => (
+                    <div
+                      key={type.Work_Type_ID}
+                      className="group flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition-all hover:border-orange-100 hover:bg-orange-50/40"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white">
+                          <Briefcase className="h-4 w-4 text-slate-400 transition-colors group-hover:text-[#ed6e2b]" />
+                        </div>
+
+                        <span className="truncate text-sm font-semibold text-slate-700">
+                          {type.Work_Type_Name}
+                        </span>
+                      </div>
+
+                      <form
+                        action={deleteWorkTypeAction}
+                        onSubmit={() => showToast("نوع فعالیت حذف شد")}
+                      >
+                        <input
+                          type="hidden"
+                          name="id"
+                          value={type.Work_Type_ID}
+                        />
+
+                        <button
+                          type="submit"
+                          aria-label={`حذف ${type.Work_Type_Name}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </form>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
+                    <Briefcase className="mx-auto mb-3 h-7 w-7 text-slate-300" />
+
+                    <p className="text-xs font-medium text-slate-400">
+                      هنوز نوع فعالیتی ثبت نشده است
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Locations */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+            <div className="border-b border-slate-100 p-5 sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50">
+                  <MapPin className="h-5 w-5 text-[#ed6e2b]" />
+                </div>
+
+                <div>
+                  <h2 className="text-base font-extrabold text-slate-900">
+                    محل‌های فعالیت
+                  </h2>
+
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {locations.length} محل فعالیت ثبت شده
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 sm:p-6">
+
+              {/* Add */}
+              <form
+                action={addLocationAction}
+                onSubmit={() => showToast("محل فعالیت اضافه شد")}
+                className="mb-5 flex gap-2"
+              >
+                <input
+                  name="name"
+                  required
+                  type="text"
+                  placeholder="نام محل فعالیت جدید..."
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-[#ed6e2b] focus:bg-white focus:ring-4 focus:ring-orange-100"
+                />
+
+                <button
+                  type="submit"
+                  aria-label="افزودن محل فعالیت"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ed6e2b] text-white shadow-sm shadow-orange-200 transition-all hover:bg-[#d95f20] hover:shadow-md active:scale-95"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </form>
+
+              {/* List */}
+              <div className="space-y-2">
+                {locations.length > 0 ? (
+                  locations.map((location: any) => (
+                    <div
+                      key={location.Location_ID}
+                      className="group flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition-all hover:border-orange-100 hover:bg-orange-50/40"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white">
+                          <MapPin className="h-4 w-4 text-slate-400 transition-colors group-hover:text-[#ed6e2b]" />
+                        </div>
+
+                        <span className="truncate text-sm font-semibold text-slate-700">
+                          {location.Location_Name}
+                        </span>
+                      </div>
+
+                      <form
+                        action={deleteLocationAction}
+                        onSubmit={() => showToast("محل فعالیت حذف شد")}
+                      >
+                        <input
+                          type="hidden"
+                          name="id"
+                          value={location.Location_ID}
+                        />
+
+                        <button
+                          type="submit"
+                          aria-label={`حذف ${location.Location_Name}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </form>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
+                    <MapPin className="mx-auto mb-3 h-7 w-7 text-slate-300" />
+
+                    <p className="text-xs font-medium text-slate-400">
+                      هنوز محل فعالیتی ثبت نشده است
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
         </div>
       </div>
 
+      {/* Toast */}
       {toast && (
-        <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#0f172a', color: 'white', padding: '12px 24px', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', animation: 'slideUp 0.3s ease-out' }}>
-          <CheckCircle style={{ width: '20px', color: '#10b981' }} />{toast}
+        <div className="fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl">
+          <CheckCircle className="h-5 w-5 text-emerald-400" />
+          {toast}
         </div>
       )}
     </div>

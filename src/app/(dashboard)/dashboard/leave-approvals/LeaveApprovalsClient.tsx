@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+
 import { reviewLeaveRequestAction } from "@/actions/leave";
 import { reviewProjectCompletionAction } from "@/actions/myProjects";
 import { reviewMissionRequestAction } from "@/actions/myMissions";
+
 import {
   Search,
   Check,
@@ -17,12 +19,16 @@ import {
   Calendar,
   Navigation,
   Crown,
+  FileCheck,
 } from "lucide-react";
 
 const toPersianDate = (date: Date | string) => {
   if (!date) return "-";
+
   const d = new Date(date);
+
   if (isNaN(d.getTime())) return "-";
+
   return d.toLocaleDateString("fa-IR");
 };
 
@@ -38,450 +44,971 @@ export default function LeaveApprovalsClient({
   missions: any[];
 }) {
   const router = useRouter();
+
   const [toast, setToast] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"leaves" | "projects" | "missions">("leaves");
 
-  const handleTabChange = (status: string) => {
-    router.push(`/dashboard/leave-approvals?status=${status}`);
+  const [activeTab, setActiveTab] = useState<
+    "leaves" | "projects" | "missions"
+  >("leaves");
+
+  const handleStatusChange = (status: string) => {
+    router.push(
+      `/dashboard/leave-approvals?status=${encodeURIComponent(status)}`,
+    );
+  };
+
+  const showToast = (message: string, duration = 3000) => {
+    setToast(message);
+
+    setTimeout(() => {
+      setToast(null);
+    }, duration);
   };
 
   const handleLeaveAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     const formData = new FormData(e.currentTarget);
+
     const result = await reviewLeaveRequestAction(formData);
+
     if (result?.success) {
-      setToast("وضعیت درخواست مرخصی تغییر کرد");
-      setTimeout(() => setToast(null), 3000);
+      showToast("وضعیت درخواست مرخصی تغییر کرد");
     }
   };
 
   const handleProjectAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     const formData = new FormData(e.currentTarget);
+
     const result: any = await reviewProjectCompletionAction(formData);
+
     if (result?.success) {
-      setToast(result?.message || "وضعیت درخواست پروژه تغییر کرد");
-      setTimeout(() => setToast(null), 4000);
+      showToast(result?.message || "وضعیت درخواست پروژه تغییر کرد", 4000);
     }
   };
 
   const handleMissionAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     const formData = new FormData(e.currentTarget);
+
     const result: any = await reviewMissionRequestAction(formData);
+
     if (result?.success) {
-      setToast("وضعیت درخواست ماموریت تغییر کرد");
-      setTimeout(() => setToast(null), 3000);
+      showToast("وضعیت درخواست مأموریت تغییر کرد");
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === "Approved" || status === "Completed")
-      return { bg: "#f0fdf4", color: "#166534", icon: <Check style={{ width: "14px", height: "14px" }} />, text: "تایید شده" };
-    if (status === "Rejected" || status === "Active")
-      return { bg: "#fef2f2", color: "#991b1b", icon: <XCircle style={{ width: "14px", height: "14px" }} />, text: "رد شده" };
-    return { bg: "#fff7ed", color: "#c2410c", icon: <Clock style={{ width: "14px", height: "14px" }} />, text: "در انتظار تایید" };
+  const getStatusConfig = (status: string) => {
+    if (status === "Approved" || status === "Completed") {
+      return {
+        label: "تأیید شده",
+        className: "border border-emerald-200 bg-emerald-50 text-emerald-700",
+        icon: Check,
+      };
+    }
+
+    if (status === "Rejected" || status === "Active") {
+      return {
+        label: "رد شده",
+        className: "border border-red-200 bg-red-50 text-red-700",
+        icon: XCircle,
+      };
+    }
+
+    return {
+      label: "در انتظار تأیید",
+      className: "border border-orange-200 bg-orange-50 text-[#c6531c]",
+      icon: Clock,
+    };
   };
 
-  const filteredRequests = requests.filter(
-    (r) =>
-      r.Personnel_PR_Leave_Requests_Personnel_IDToPersonnel?.Full_Name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.PR_Leave_Types?.Leave_Type_Name?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredRequests = requests.filter((r) => {
+    const search = searchTerm.toLowerCase();
 
-  const filteredProjects = projects.filter(
-    (p) =>
-      p.Project_Name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.PR_Project_Assignments[0]?.Personnel?.Full_Name?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+    return (
+      r.Personnel_PR_Leave_Requests_Personnel_IDToPersonnel?.Full_Name?.toLowerCase().includes(
+        search,
+      ) || r.PR_Leave_Types?.Leave_Type_Name?.toLowerCase().includes(search)
+    );
+  });
 
-  const filteredMissions = missions.filter(
-    (m) =>
-      m.Personnel?.Full_Name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.Origin?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredProjects = projects.filter((p) => {
+    const search = searchTerm.toLowerCase();
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: "10px",
-    border: "1px solid #e2e8f0",
-    outline: "none",
-    fontSize: "14px",
-    backgroundColor: "#f8fafc",
-    boxSizing: "border-box",
-  };
+    return (
+      p.Project_Name?.toLowerCase().includes(search) ||
+      p.PR_Project_Assignments?.[0]?.Personnel?.Full_Name?.toLowerCase().includes(
+        search,
+      )
+    );
+  });
 
-  const btnApprove: React.CSSProperties = {
-    display: "flex", alignItems: "center", gap: "4px", padding: "8px 16px",
-    backgroundColor: "#16a34a", color: "white", border: "none",
-    borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px",
-  };
+  const filteredMissions = missions.filter((m) => {
+    const search = searchTerm.toLowerCase();
 
-  const btnReject: React.CSSProperties = {
-    display: "flex", alignItems: "center", gap: "4px", padding: "8px 16px",
-    backgroundColor: "#ef4444", color: "white", border: "none",
-    borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px",
-  };
+    return (
+      m.Personnel?.Full_Name?.toLowerCase().includes(search) ||
+      m.Origin?.toLowerCase().includes(search) ||
+      m.Destination?.toLowerCase().includes(search)
+    );
+  });
 
-  const thStyle: React.CSSProperties = {
-    padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b",
-  };
+  const pendingCount =
+    activeTab === "leaves"
+      ? requests.length
+      : activeTab === "projects"
+        ? projects.length
+        : missions.length;
 
   return (
-    <div style={{ backgroundColor: "#f1f5f9", minHeight: "100vh", padding: "24px" }}>
-      <style>{`@keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }`}</style>
+    <div dir="rtl" className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* =====================================================
+            HEADER
+        ====================================================== */}
 
-      {/* تب‌های اصلی (مرخصی / پروژه / ماموریت) */}
-      <div style={{ backgroundColor: "white", borderRadius: "20px", padding: "12px 16px", marginBottom: "20px", display: "flex", gap: "12px" }}>
-        <button
-          onClick={() => setActiveTab("leaves")}
-          style={{
-            flex: 1, padding: "12px", borderRadius: "10px",
-            border: `1px solid ${activeTab === "leaves" ? "#ed6e2b" : "#e2e8f0"}`,
-            backgroundColor: activeTab === "leaves" ? "#fff7ed" : "white",
-            color: activeTab === "leaves" ? "#c2410c" : "#64748b",
-            fontWeight: "bold", display: "flex", alignItems: "center",
-            justifyContent: "center", gap: "8px", cursor: "pointer",
-          }}
-        >
-          <Calendar style={{ width: "18px", height: "18px" }} /> مرخصی
-        </button>
-        <button
-          onClick={() => setActiveTab("projects")}
-          style={{
-            flex: 1, padding: "12px", borderRadius: "10px",
-            border: `1px solid ${activeTab === "projects" ? "#ed6e2b" : "#e2e8f0"}`,
-            backgroundColor: activeTab === "projects" ? "#fff7ed" : "white",
-            color: activeTab === "projects" ? "#c2410c" : "#64748b",
-            fontWeight: "bold", display: "flex", alignItems: "center",
-            justifyContent: "center", gap: "8px", cursor: "pointer",
-          }}
-        >
-          <Briefcase style={{ width: "18px", height: "18px" }} /> پروژه
-          {projects.length > 0 && currentStatus === "Pending" && (
-            <span style={{ backgroundColor: "#ef4444", color: "white", borderRadius: "50%", padding: "2px 6px", fontSize: "10px" }}>
-              {projects.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("missions")}
-          style={{
-            flex: 1, padding: "12px", borderRadius: "10px",
-            border: `1px solid ${activeTab === "missions" ? "#ed6e2b" : "#e2e8f0"}`,
-            backgroundColor: activeTab === "missions" ? "#fff7ed" : "white",
-            color: activeTab === "missions" ? "#c2410c" : "#64748b",
-            fontWeight: "bold", display: "flex", alignItems: "center",
-            justifyContent: "center", gap: "8px", cursor: "pointer",
-          }}
-        >
-          <Navigation style={{ width: "18px", height: "18px" }} /> ماموریت
-          {missions.length > 0 && currentStatus === "Pending" && (
-            <span style={{ backgroundColor: "#ef4444", color: "white", borderRadius: "50%", padding: "2px 6px", fontSize: "10px" }}>
-              {missions.length}
-            </span>
-          )}
-        </button>
-      </div>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#ed6e2b]">
+                <FileCheck className="h-6 w-6" />
+              </div>
 
-      {/* جستجو */}
-      <div style={{ backgroundColor: "white", borderRadius: "20px", padding: "16px 24px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-        <div style={{ position: "relative", width: "100%", maxWidth: "400px" }}>
-          <Search style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", width: "20px", height: "20px", color: "#94a3b8" }} />
-          <input
-            type="text"
-            placeholder="جستجوی نام کارمند، نوع درخواست یا پروژه..."
-            style={{ ...inputStyle, padding: "12px 40px 12px 16px" }}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                  مدیریت درخواست‌ها
+                </h1>
 
-      {/* تب‌های وضعیت */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-        <button
-          onClick={() => handleTabChange("Pending")}
-          style={{
-            padding: "10px 20px", borderRadius: "10px", border: "none",
-            cursor: "pointer", fontWeight: "bold",
-            backgroundColor: currentStatus === "Pending" ? "#ed6e2b" : "white",
-            color: currentStatus === "Pending" ? "white" : "#64748b",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-          }}
-        >
-          در انتظار
-        </button>
-        <button
-          onClick={() => handleTabChange("Approved")}
-          style={{
-            padding: "10px 20px", borderRadius: "10px", border: "none",
-            cursor: "pointer", fontWeight: "bold",
-            backgroundColor: currentStatus === "Approved" ? "#16a34a" : "white",
-            color: currentStatus === "Approved" ? "white" : "#64748b",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-          }}
-        >
-          تایید شده
-        </button>
-        <button
-          onClick={() => handleTabChange("Rejected")}
-          style={{
-            padding: "10px 20px", borderRadius: "10px", border: "none",
-            cursor: "pointer", fontWeight: "bold",
-            backgroundColor: currentStatus === "Rejected" ? "#ef4444" : "white",
-            color: currentStatus === "Rejected" ? "white" : "#64748b",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-          }}
-        >
-          رد شده
-        </button>
-      </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  بررسی و مدیریت درخواست‌های کارکنان
+                </p>
+              </div>
+            </div>
 
-      {/* جدول درخواست‌های مرخصی */}
-      {activeTab === "leaves" && (
-        <div style={{ backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f8fafc", textAlign: "right" }}>
-                <th style={thStyle}>کارمند</th>
-                <th style={thStyle}>نوع مرخصی</th>
-                <th style={thStyle}>از تاریخ</th>
-                <th style={thStyle}>روز</th>
-                <th style={thStyle}>وضعیت</th>
-                {currentStatus === "Pending" && <th style={thStyle}>عملیات</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRequests.map((r: any) => {
-                const status = getStatusBadge(r.Status);
-                return (
-                  <tr key={r.Leave_ID} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    <td style={{ padding: "16px", fontSize: "14px", color: "#0f172a", fontWeight: 600 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <UserCircle2 style={{ width: "24px", height: "24px", color: "#cbd5e1" }} />
-                        {r.Personnel_PR_Leave_Requests_Personnel_IDToPersonnel?.Full_Name || "-"}
-                      </div>
-                    </td>
-                    <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>
-                      {r.PR_Leave_Types?.Leave_Type_Name || "-"}
-                    </td>
-                    <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>
-                      {toPersianDate(r.Start_Date)}
-                    </td>
-                    <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>
-                      {r.Days_Count || 1} روز
-                    </td>
-                    <td style={{ padding: "16px", fontSize: "14px" }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, backgroundColor: status.bg, color: status.color }}>
-                        {status.icon}
-                        {status.text}
-                      </span>
-                    </td>
-                    {currentStatus === "Pending" && (
-                      <td style={{ padding: "16px", fontSize: "14px" }}>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <form onSubmit={handleLeaveAction}>
-                            <input type="hidden" name="leaveId" value={r.Leave_ID} />
-                            <input type="hidden" name="action" value="approve" />
-                            <button type="submit" style={btnApprove}>
-                              <Check style={{ width: "14px", height: "14px" }} /> تایید
-                            </button>
-                          </form>
-                          <form onSubmit={handleLeaveAction}>
-                            <input type="hidden" name="leaveId" value={r.Leave_ID} />
-                            <input type="hidden" name="action" value="reject" />
-                            <button type="submit" style={btnReject}>
-                              <X style={{ width: "14px", height: "14px" }} /> رد
-                            </button>
-                          </form>
+            {currentStatus === "Pending" && (
+              <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-bold text-[#c6531c]">
+                <Clock className="h-4 w-4" />
+                {pendingCount.toLocaleString("fa-IR")} درخواست در انتظار بررسی
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* =====================================================
+            REQUEST TYPE TABS
+        ====================================================== */}
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {/* Leaves */}
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("leaves")}
+              className={`flex items-center justify-between rounded-xl border px-4 py-3 transition ${
+                activeTab === "leaves"
+                  ? "border-orange-200 bg-orange-50 text-[#c6531c]"
+                  : "border-transparent bg-slate-50 text-slate-500 hover:border-slate-200 hover:bg-white"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Calendar className="h-5 w-5" />
+
+                <span className="text-sm font-bold">درخواست‌های مرخصی</span>
+              </span>
+
+              {currentStatus === "Pending" && requests.length > 0 && (
+                <span
+                  className={`rounded-lg px-2 py-1 text-[11px] font-bold ${
+                    activeTab === "leaves"
+                      ? "bg-orange-100 text-[#c6531c]"
+                      : "bg-white text-slate-500"
+                  }`}
+                >
+                  {requests.length.toLocaleString("fa-IR")}
+                </span>
+              )}
+            </button>
+
+            {/* Projects */}
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("projects")}
+              className={`flex items-center justify-between rounded-xl border px-4 py-3 transition ${
+                activeTab === "projects"
+                  ? "border-orange-200 bg-orange-50 text-[#c6531c]"
+                  : "border-transparent bg-slate-50 text-slate-500 hover:border-slate-200 hover:bg-white"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Briefcase className="h-5 w-5" />
+
+                <span className="text-sm font-bold">اتمام پروژه</span>
+              </span>
+
+              {currentStatus === "Pending" && projects.length > 0 && (
+                <span
+                  className={`rounded-lg px-2 py-1 text-[11px] font-bold ${
+                    activeTab === "projects"
+                      ? "bg-orange-100 text-[#c6531c]"
+                      : "bg-white text-slate-500"
+                  }`}
+                >
+                  {projects.length.toLocaleString("fa-IR")}
+                </span>
+              )}
+            </button>
+
+            {/* Missions */}
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("missions")}
+              className={`flex items-center justify-between rounded-xl border px-4 py-3 transition ${
+                activeTab === "missions"
+                  ? "border-orange-200 bg-orange-50 text-[#c6531c]"
+                  : "border-transparent bg-slate-50 text-slate-500 hover:border-slate-200 hover:bg-white"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Navigation className="h-5 w-5" />
+
+                <span className="text-sm font-bold">درخواست‌های مأموریت</span>
+              </span>
+
+              {currentStatus === "Pending" && missions.length > 0 && (
+                <span
+                  className={`rounded-lg px-2 py-1 text-[11px] font-bold ${
+                    activeTab === "missions"
+                      ? "bg-orange-100 text-[#c6531c]"
+                      : "bg-white text-slate-500"
+                  }`}
+                >
+                  {missions.length.toLocaleString("fa-IR")}
+                </span>
+              )}
+            </button>
+          </div>
+        </section>
+
+        {/* =====================================================
+            FILTERS
+        ====================================================== */}
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Search className="h-4 w-4" />
+            </div>
+
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                جستجو و فیلتر درخواست‌ها
+              </h2>
+
+              <p className="mt-0.5 text-xs text-slate-500">
+                نام کارمند یا اطلاعات مربوط به درخواست را جستجو کنید
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full lg:max-w-md">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="جستجوی نام کارمند، پروژه، نوع مرخصی..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 pr-10 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#ed6e2b] focus:bg-white focus:ring-4 focus:ring-orange-50"
+              />
+            </div>
+
+            {/* Status Filters */}
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => handleStatusChange("Pending")}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all ${
+                  currentStatus === "Pending"
+                    ? "border-[#ed6e2b] bg-[#ed6e2b] text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-orange-200 hover:bg-orange-50 hover:text-[#ed6e2b]"
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                در انتظار
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleStatusChange("Approved")}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all ${
+                  currentStatus === "Approved"
+                    ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                }`}
+              >
+                <CheckCircle className="h-4 w-4" />
+                تأیید شده
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleStatusChange("Rejected")}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition-all ${
+                  currentStatus === "Rejected"
+                    ? "border-red-600 bg-red-600 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                }`}
+              >
+                <XCircle className="h-4 w-4" />
+                رد شده
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================
+            LEAVE REQUESTS
+        ====================================================== */}
+
+        {activeTab === "leaves" && (
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-[#ed6e2b]">
+                  <Calendar className="h-4 w-4" />
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    درخواست‌های مرخصی
+                  </h2>
+
+                  <p className="text-xs text-slate-500">
+                    {filteredRequests.length.toLocaleString("fa-IR")} درخواست
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {filteredRequests.length > 0 ? (
+              <>
+                {/* Desktop */}
+
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-[900px] text-right">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50">
+                        <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                          کارمند
+                        </th>
+
+                        <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                          نوع مرخصی
+                        </th>
+
+                        <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                          از تاریخ
+                        </th>
+
+                        <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                          مدت
+                        </th>
+
+                        <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                          وضعیت
+                        </th>
+
+                        {currentStatus === "Pending" && (
+                          <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                            عملیات
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {filteredRequests.map((r: any) => {
+                        const status = getStatusConfig(r.Status);
+                        const StatusIcon = status.icon;
+
+                        return (
+                          <tr
+                            key={r.Leave_ID}
+                            className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70"
+                          >
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                                  <UserCircle2 className="h-5 w-5" />
+                                </div>
+
+                                <span className="font-semibold text-slate-800">
+                                  {r
+                                    .Personnel_PR_Leave_Requests_Personnel_IDToPersonnel
+                                    ?.Full_Name || "-"}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-4 text-sm text-slate-600">
+                              {r.PR_Leave_Types?.Leave_Type_Name || "-"}
+                            </td>
+
+                            <td className="px-5 py-4 text-sm text-slate-600">
+                              {toPersianDate(r.Start_Date)}
+                            </td>
+
+                            <td className="px-5 py-4">
+                              <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                                {r.Days_Count || 1} روز
+                              </span>
+                            </td>
+
+                            <td className="px-5 py-4">
+                              <span
+                                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${status.className}`}
+                              >
+                                <StatusIcon className="h-3.5 w-3.5" />
+                                {status.label}
+                              </span>
+                            </td>
+
+                            {currentStatus === "Pending" && (
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-2">
+                                  <form onSubmit={handleLeaveAction}>
+                                    <input
+                                      type="hidden"
+                                      name="leaveId"
+                                      value={r.Leave_ID}
+                                    />
+
+                                    <input
+                                      type="hidden"
+                                      name="action"
+                                      value="approve"
+                                    />
+
+                                    <button
+                                      type="submit"
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                      تأیید
+                                    </button>
+                                  </form>
+
+                                  <form onSubmit={handleLeaveAction}>
+                                    <input
+                                      type="hidden"
+                                      name="leaveId"
+                                      value={r.Leave_ID}
+                                    />
+
+                                    <input
+                                      type="hidden"
+                                      name="action"
+                                      value="reject"
+                                    />
+
+                                    <button
+                                      type="submit"
+                                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                      رد
+                                    </button>
+                                  </form>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile */}
+
+                <div className="divide-y divide-slate-100 md:hidden">
+                  {filteredRequests.map((r: any) => {
+                    const status = getStatusConfig(r.Status);
+                    const StatusIcon = status.icon;
+
+                    return (
+                      <div key={r.Leave_ID} className="space-y-4 p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                              <UserCircle2 className="h-5 w-5" />
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-slate-400">کارمند</p>
+
+                              <p className="mt-1 font-bold text-slate-800">
+                                {r
+                                  .Personnel_PR_Leave_Requests_Personnel_IDToPersonnel
+                                  ?.Full_Name || "-"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${status.className}`}
+                          >
+                            <StatusIcon className="h-3 w-3" />
+                            {status.label}
+                          </span>
                         </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-              {filteredRequests.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>
-                    درخواستی یافت نشد
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* جدول درخواست‌های اتمام پروژه */}
-      {activeTab === "projects" && (
-        <div style={{ backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f8fafc", textAlign: "right" }}>
-                <th style={thStyle}>نام پروژه</th>
-                <th style={thStyle}>👑 مسئول پروژه</th>
-                <th style={thStyle}>تاریخ طلایی</th>
-                <th style={thStyle}>تاریخ پایان</th>
-                <th style={thStyle}>پاداش محاسبه شده</th>
-                {currentStatus === "Pending" && <th style={thStyle}>عملیات</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProjects.map((p: any) => (
-                <tr key={p.Project_ID} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "16px", fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                    {p.Project_Name}
-                  </td>
-                  <td style={{ padding: "16px", fontSize: "14px", color: "#92400e", fontWeight: 600 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <Crown style={{ width: "14px", height: "14px", color: "#d97706" }} />
-                      {p.Project_Leader?.Full_Name || "-"}
-                    </div>
-                  </td>
-                  <td style={{ padding: "16px", fontSize: "14px", color: "#c2410c" }}>
-                    {toPersianDate(p.Golden_Date)}
-                  </td>
-                  <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>
-                    {toPersianDate(p.End_Date)}
-                  </td>
-                  <td style={{ padding: "16px", fontSize: "14px" }}>
-                    {p.Final_Bonus != null ? (
-                      <span style={{ fontWeight: "bold", color: "#166534" }}>
-                        {Number(p.Final_Bonus).toLocaleString("fa-IR")} ریال
-                      </span>
-                    ) : (
-                      <span style={{ color: "#94a3b8", fontSize: "12px" }}>
-                        پس از تایید محاسبه می‌شود
-                      </span>
-                    )}
-                  </td>
-                  {currentStatus === "Pending" && (
-                    <td style={{ padding: "16px" }}>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <form onSubmit={handleProjectAction}>
-                          <input type="hidden" name="projectId" value={p.Project_ID} />
-                          <input type="hidden" name="action" value="approve" />
-                          <button type="submit" style={btnApprove}>
-                            <Check style={{ width: "14px" }} /> تایید
-                          </button>
-                        </form>
-                        <form onSubmit={handleProjectAction}>
-                          <input type="hidden" name="projectId" value={p.Project_ID} />
-                          <input type="hidden" name="action" value="reject" />
-                          <button type="submit" style={btnReject}>
-                            <X style={{ width: "14px" }} /> رد
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {filteredProjects.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>
-                    درخواستی یافت نشد
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-[11px] text-slate-400">
+                            نوع مرخصی
+                          </p>
 
-      {/* جدول درخواست‌های ماموریت */}
-      {activeTab === "missions" && (
-        <div style={{ backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f8fafc", textAlign: "right" }}>
-                <th style={thStyle}>کارمند</th>
-                <th style={thStyle}>مسیر</th>
-                <th style={thStyle}>تاریخ</th>
-                <th style={thStyle}>مبلغ</th>
-                {currentStatus === "Pending" && <th style={thStyle}>عملیات</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMissions.map((m: any) => (
-                <tr key={m.Commute_ID} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "16px", fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <UserCircle2 style={{ width: "24px", height: "24px", color: "#cbd5e1" }} />
-                      {m.Personnel?.Full_Name || "-"}
-                    </div>
-                  </td>
-                  <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>
-                    {m.Origin} به {m.Destination}
-                  </td>
-                  <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>
-                    {toPersianDate(m.Commute_Date)}
-                  </td>
-                  <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>
-                    {Number(m.Amount || 0).toLocaleString("fa-IR")} ریال
-                  </td>
-                  {currentStatus === "Pending" && (
-                    <td style={{ padding: "16px" }}>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <form onSubmit={handleMissionAction}>
-                          <input type="hidden" name="commuteId" value={m.Commute_ID} />
-                          <input type="hidden" name="action" value="approve" />
-                          <button type="submit" style={btnApprove}>
-                            <Check style={{ width: "14px" }} /> تایید
-                          </button>
-                        </form>
-                        <form onSubmit={handleMissionAction}>
-                          <input type="hidden" name="commuteId" value={m.Commute_ID} />
-                          <input type="hidden" name="action" value="reject" />
-                          <button type="submit" style={btnReject}>
-                            <X style={{ width: "14px" }} /> رد
-                          </button>
-                        </form>
+                          <p className="mt-1 text-sm font-bold text-slate-700">
+                            {r.PR_Leave_Types?.Leave_Type_Name || "-"}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-xl bg-slate-50 p-3">
+                            <p className="text-[11px] text-slate-400">
+                              از تاریخ
+                            </p>
+
+                            <p className="mt-1 text-sm font-semibold text-slate-700">
+                              {toPersianDate(r.Start_Date)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-slate-50 p-3">
+                            <p className="text-[11px] text-slate-400">مدت</p>
+
+                            <p className="mt-1 text-sm font-semibold text-slate-700">
+                              {r.Days_Count || 1} روز
+                            </p>
+                          </div>
+                        </div>
+
+                        {currentStatus === "Pending" && (
+                          <div className="flex gap-2 pt-1">
+                            <form
+                              onSubmit={handleLeaveAction}
+                              className="flex-1"
+                            >
+                              <input
+                                type="hidden"
+                                name="leaveId"
+                                value={r.Leave_ID}
+                              />
+
+                              <input
+                                type="hidden"
+                                name="action"
+                                value="approve"
+                              />
+
+                              <button
+                                type="submit"
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+                              >
+                                <Check className="h-4 w-4" />
+                                تأیید
+                              </button>
+                            </form>
+
+                            <form
+                              onSubmit={handleLeaveAction}
+                              className="flex-1"
+                            >
+                              <input
+                                type="hidden"
+                                name="leaveId"
+                                value={r.Leave_ID}
+                              />
+
+                              <input
+                                type="hidden"
+                                name="action"
+                                value="reject"
+                              />
+
+                              <button
+                                type="submit"
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                              >
+                                <X className="h-4 w-4" />
+                                رد
+                              </button>
+                            </form>
+                          </div>
+                        )}
                       </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {filteredMissions.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>
-                    درخواستی یافت نشد
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <EmptyState />
+            )}
+          </section>
+        )}
+
+        {/* =====================================================
+            PROJECT REQUESTS
+        ====================================================== */}
+
+        {activeTab === "projects" && (
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <SectionHeader
+              icon={<Briefcase className="h-4 w-4" />}
+              title="درخواست‌های اتمام پروژه"
+              count={filteredProjects.length}
+            />
+
+            {filteredProjects.length > 0 ? (
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[900px] text-right">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        نام پروژه
+                      </th>
+
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        مسئول پروژه
+                      </th>
+
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        تاریخ طلایی
+                      </th>
+
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        تاریخ پایان
+                      </th>
+
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        پاداش
+                      </th>
+
+                      {currentStatus === "Pending" && (
+                        <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                          عملیات
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredProjects.map((p: any) => (
+                      <tr
+                        key={p.Project_ID}
+                        className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70"
+                      >
+                        <td className="px-5 py-4 font-semibold text-slate-800">
+                          {p.Project_Name || "-"}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-[#d97706]">
+                              <Crown className="h-4 w-4" />
+                            </div>
+
+                            {p.Project_Leader?.Full_Name || "-"}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-[#c6531c]">
+                          {toPersianDate(p.Golden_Date)}
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-slate-600">
+                          {toPersianDate(p.End_Date)}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          {p.Final_Bonus != null ? (
+                            <span className="font-bold text-emerald-700">
+                              {Number(p.Final_Bonus).toLocaleString("fa-IR")}{" "}
+                              ریال
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">
+                              پس از تأیید محاسبه می‌شود
+                            </span>
+                          )}
+                        </td>
+
+                        {currentStatus === "Pending" && (
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2">
+                              <form onSubmit={handleProjectAction}>
+                                <input
+                                  type="hidden"
+                                  name="projectId"
+                                  value={p.Project_ID}
+                                />
+
+                                <input
+                                  type="hidden"
+                                  name="action"
+                                  value="approve"
+                                />
+
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  تأیید
+                                </button>
+                              </form>
+
+                              <form onSubmit={handleProjectAction}>
+                                <input
+                                  type="hidden"
+                                  name="projectId"
+                                  value={p.Project_ID}
+                                />
+
+                                <input
+                                  type="hidden"
+                                  name="action"
+                                  value="reject"
+                                />
+
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                  رد
+                                </button>
+                              </form>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState />
+            )}
+          </section>
+        )}
+
+        {/* =====================================================
+            MISSION REQUESTS
+        ====================================================== */}
+
+        {activeTab === "missions" && (
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <SectionHeader
+              icon={<Navigation className="h-4 w-4" />}
+              title="درخواست‌های مأموریت"
+              count={filteredMissions.length}
+            />
+
+            {filteredMissions.length > 0 ? (
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[850px] text-right">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        کارمند
+                      </th>
+
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        مسیر
+                      </th>
+
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        تاریخ
+                      </th>
+
+                      <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                        مبلغ
+                      </th>
+
+                      {currentStatus === "Pending" && (
+                        <th className="px-5 py-4 text-xs font-bold text-slate-500">
+                          عملیات
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredMissions.map((m: any) => (
+                      <tr
+                        key={m.Commute_ID}
+                        className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/70"
+                      >
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                              <UserCircle2 className="h-5 w-5" />
+                            </div>
+
+                            <span className="font-semibold text-slate-800">
+                              {m.Personnel?.Full_Name || "-"}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-slate-600">
+                          {m.Origin || "-"} به {m.Destination || "-"}
+                        </td>
+
+                        <td className="px-5 py-4 text-sm text-slate-600">
+                          {toPersianDate(m.Commute_Date)}
+                        </td>
+
+                        <td className="px-5 py-4 font-semibold text-slate-700">
+                          {Number(m.Amount || 0).toLocaleString("fa-IR")} ریال
+                        </td>
+
+                        {currentStatus === "Pending" && (
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2">
+                              <form onSubmit={handleMissionAction}>
+                                <input
+                                  type="hidden"
+                                  name="commuteId"
+                                  value={m.Commute_ID}
+                                />
+
+                                <input
+                                  type="hidden"
+                                  name="action"
+                                  value="approve"
+                                />
+
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                  تأیید
+                                </button>
+                              </form>
+
+                              <form onSubmit={handleMissionAction}>
+                                <input
+                                  type="hidden"
+                                  name="commuteId"
+                                  value={m.Commute_ID}
+                                />
+
+                                <input
+                                  type="hidden"
+                                  name="action"
+                                  value="reject"
+                                />
+
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                  رد
+                                </button>
+                              </form>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState />
+            )}
+          </section>
+        )}
+      </div>
+
+      {/* =====================================================
+          TOAST
+      ====================================================== */}
 
       {toast && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "24px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            backgroundColor: "#0f172a",
-            color: "white",
-            padding: "12px 24px",
-            borderRadius: "12px",
-            boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)",
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            fontSize: "14px",
-            fontWeight: 500,
-            animation: "slideUp 0.3s ease-out",
-          }}
-        >
-          <CheckCircle style={{ width: "20px", height: "20px", color: "#10b981" }} />
+        <div className="fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-xl border border-emerald-200 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 shadow-xl">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50">
+            <CheckCircle className="h-4 w-4 text-emerald-500" />
+          </div>
+
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   REUSABLE SECTION HEADER
+============================================================ */
+
+function SectionHeader({
+  icon,
+  title,
+  count,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  count: number;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-50 text-[#ed6e2b]">
+          {icon}
+        </div>
+
+        <div>
+          <h2 className="text-sm font-bold text-slate-900">{title}</h2>
+
+          <p className="text-xs text-slate-500">
+            {count.toLocaleString("fa-IR")} درخواست
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   EMPTY STATE
+============================================================ */
+
+function EmptyState() {
+  return (
+    <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+        <FileCheck className="h-7 w-7" />
+      </div>
+
+      <h3 className="font-bold text-slate-700">درخواستی یافت نشد</h3>
+
+      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">
+        در حال حاضر درخواستی مطابق فیلترها و جستجوی انتخاب‌شده وجود ندارد.
+      </p>
     </div>
   );
 }

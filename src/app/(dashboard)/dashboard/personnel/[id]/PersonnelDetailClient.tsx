@@ -17,19 +17,6 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const toPersianDate = (date: Date | string) => { if (!date) return "-"; const d = new Date(date); if (isNaN(d.getTime())) return "-"; return d.toLocaleDateString("fa-IR"); };
 const toPersianTime = (timeStr: Date | string) => { if (!timeStr) return "-"; const d = new Date(timeStr); if (isNaN(d.getTime())) return "-"; return d.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" }); };
-const translateRole = (role: string) => {
-  if (!role) return "-";
-  const roles: any = {
-    "Factory Manager": "مدیر کارخانه", "Factory_Manager": "مدیر کارخانه",
-    "ModirNet": "مدیر نت",
-    "Production Supervisor": "سرپرست تولید", "Production_Supervisor": "سرپرست تولید",
-    "Repairer": "تعمیرکار",
-    "Operator": "اپراتور",
-    "Commerce": "بازرگانی",
-    "Contractor": "پیمانکار"
-  };
-  return roles[role] || role.replace(/_/g, ' ');
-};
 const translateStatus = (status: string) => { const statuses: any = { "Draft": "پیش‌نویس", "Submitted": "ارسال شده", "Manager_Reviewed": "بررسی شده توسط مدیر", "Finance_Processed": "تسویه شده توسط مالی", "Rejected": "رد شده" }; return statuses[status] || status; };
 const translateCommute = (status: string) => { const s: any = { "CompanyVehicle": "وسیله نقلیه شرکت", "PersonalVehicle": "وسیله نقلیه شخصی", "PublicTransport": "حمل و نقل عمومی", "None": "هیچ‌کدام", "Taxi": "تاکسی", "Other": "سایر" }; return s[status] || status || "-"; };
 const formatToLocalISO = (dateObj: any) => { if (!dateObj) return ""; try { const date = dateObj instanceof Date ? dateObj : dateObj.toDate ? dateObj.toDate() : new Date(dateObj); if (isNaN(date.getTime())) return ""; return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; } catch (e) { return ""; } };
@@ -115,12 +102,30 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
           <div style={{ width: "60px", height: "60px", borderRadius: "16px", overflow: "hidden", background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #ffedd5" }}>
             {data.Personal_Image_Path ? <img src={data.Personal_Image_Path} alt={data.Full_Name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <User style={{ width: "28px", height: "28px", color: "#ed6e2b" }} />}
           </div>
-          <div><h1 style={{ margin: 0, fontSize: "22px", fontWeight: "bold", color: "#0f172a" }}>{data.Full_Name}</h1><p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "#64748b" }}>{data.Personnel_Code} - {translateRole(data.Role)}</p></div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "bold", color: "#0f172a" }}>{data.Full_Name}</h1>
+            <p style={{ margin: "4px 0 0 0", fontSize: "14px", color: "#64748b" }}>
+              {data.Personnel_Code} - {data.OrganizationalPosition?.Name || "بدون جایگاه"} {data.Unit?.Name ? `| ${data.Unit.Name}` : ""}
+            </p>
+          </div>
         </div>
-        <form action={togglePersonnelStatus}>
-          <input type="hidden" name="id" value={data.Personnel_ID} /><input type="hidden" name="isActive" value={data.IsActive ? "true" : "false"} />
-          <button type="submit" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", border: `1px solid ${data.IsActive ? "#fecaca" : "#bbf7d0"}`, cursor: "pointer", fontWeight: "bold", backgroundColor: data.IsActive ? "#fef2f2" : "#f0fdf4", color: data.IsActive ? "#991b1b" : "#166534" }}><Power style={{ width: "18px", height: "18px" }} />{data.IsActive ? "غیرفعال کردن" : "فعال کردن"}</button>
-        </form>
+        
+        <div style={{ display: "flex", gap: "12px" }}>
+          {/* دکمه ویرایش با استایل مشابه دکمه وضعیت (آبی رنگ) */}
+          <button 
+            onClick={() => router.push(`/dashboard/personnel/${data.Personnel_ID}/edit`)} 
+            style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", border: "1px solid #bfdbfe", cursor: "pointer", fontWeight: "bold", backgroundColor: "#eff6ff", color: "#1d4ed8" }}
+          >
+            <Save style={{ width: "18px", height: "18px" }} /> ویرایش اطلاعات
+          </button>
+
+          <form action={togglePersonnelStatus}>
+            <input type="hidden" name="id" value={data.Personnel_ID} /><input type="hidden" name="isActive" value={data.IsActive ? "true" : "false"} />
+            <button type="submit" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", borderRadius: "12px", border: `1px solid ${data.IsActive ? "#fecaca" : "#bbf7d0"}`, cursor: "pointer", fontWeight: "bold", backgroundColor: data.IsActive ? "#fef2f2" : "#f0fdf4", color: data.IsActive ? "#991b1b" : "#166534" }}>
+              <Power style={{ width: "18px", height: "18px" }} />{data.IsActive ? "غیرفعال کردن" : "فعال کردن"}
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* باکس ۲: فیلتر تاریخ */}

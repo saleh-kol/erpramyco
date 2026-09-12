@@ -2,26 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { updateMissionAction, deleteMissionAction } from "@/actions/missionDetails";
+import { updateMissionAction, deleteMissionAction } from "@/actions/missions";
 import {
   ArrowRight, Save, CheckCircle, Trash2, AlertTriangle, Navigation, UserCircle2, MapPin
 } from "lucide-react";
 
 const toPersianDate = (date: Date | string) => { if (!date) return "-"; const d = new Date(date); if (isNaN(d.getTime())) return "-"; return d.toLocaleDateString("fa-IR"); };
-const translateRole = (role: string) => {
-  if (!role) return "-";
-  const roles: any = {
-    "Factory Manager": "مدیر کارخانه", "Factory_Manager": "مدیر کارخانه",
-    "ModirNet": "مدیر نت",
-    "Production Supervisor": "سرپرست تولید", "Production_Supervisor": "سرپرست تولید",
-    "Repairer": "تعمیرکار",
-    "Operator": "اپراتور",
-    "Commerce": "بازرگانی",
-    "Contractor": "پیمانکار"
-  };
-  return roles[role] || role.replace(/_/g, ' ');
+const translateCommuteType = (type: string) => { 
+  const types: any = { "CompanyVehicle": "وسیله نقلیه شرکت", "PersonalVehicle": "وسیله نقلیه شخصی", "PublicTransport": "حمل و نقل عمومی", "Taxi": "تاکسی", "Other": "سایر" }; 
+  return types[type] || type || "-"; 
 };
-const translateCommuteType = (type: string) => { const types: any = { "CompanyVehicle": "وسیله نقلیه شرکت", "PersonalVehicle": "وسیله نقلیه شخصی", "PublicTransport": "حمل و نقل عمومی", "Taxi": "تاکسی", "Other": "سایر" }; return types[type] || type; };
 
 export default function MissionDetailClient({ data }: { data: any }) {
   const router = useRouter();
@@ -78,7 +68,7 @@ export default function MissionDetailClient({ data }: { data: any }) {
           </button>
           <div style={{ background: "#fff7ed", padding: "10px", borderRadius: "12px" }}><Navigation style={{ width: "24px", height: "24px", color: "#ed6e2b" }} /></div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>{data.Origin} به {data.Destination}</h1>
+            <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>{data.Origin || "-"} به {data.Destination || "-"}</h1>
             <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>تاریخ ماموریت: {toPersianDate(data.Commute_Date)}</p>
           </div>
         </div>
@@ -97,8 +87,8 @@ export default function MissionDetailClient({ data }: { data: any }) {
           </h2>
           
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-            <div><label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>مبدا</label><input name="origin" defaultValue={data.Origin} type="text" className="erp-input" /></div>
-            <div><label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>مقصد</label><input name="destination" defaultValue={data.Destination} type="text" className="erp-input" /></div>
+            <div><label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>مبدا</label><input name="origin" defaultValue={data.Origin || ""} type="text" className="erp-input" /></div>
+            <div><label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>مقصد</label><input name="destination" defaultValue={data.Destination || ""} type="text" className="erp-input" /></div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
@@ -131,8 +121,10 @@ export default function MissionDetailClient({ data }: { data: any }) {
                 {data.Personnel?.Personal_Image_Path ? <img src={data.Personnel.Personal_Image_Path} alt={data.Personnel.Full_Name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UserCircle2 style={{ width: "100%", height: "100%", color: "#cbd5e1" }} />}
               </div>
               <div>
-                <p style={{ margin: 0, fontWeight: "bold", fontSize: "14px", color: "#0f172a" }}>{data.Personnel?.Full_Name}</p>
-                <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>{data.Personnel?.Personnel_Code} - {translateRole(data.Personnel?.Role)}</p>
+                <p style={{ margin: 0, fontWeight: "bold", fontSize: "14px", color: "#0f172a" }}>{data.Personnel?.Full_Name || "نامشخص"}</p>
+                <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>
+                  {data.Personnel?.Personnel_Code || "-"} - {data.Personnel?.OrganizationalPosition?.Name || "بدون جایگاه"} - {data.Personnel?.Unit?.Name || "بدون واحد"}
+                </p>
               </div>
             </div>
           </div>

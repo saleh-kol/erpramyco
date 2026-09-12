@@ -32,17 +32,6 @@ function recordFailedAttempt(username: string) {
   loginAttempts.set(username, record);
 }
 
-// مپینگ نقش‌ها
-const roleMap: Record<string, string> = {
-  Production_Supervisor: "سرپرست",
-  Factory_Manager: "مدیر کارخانه",
-  ModirNet: "مدیر نت",
-  Repairer: "تعمیرکار",
-  Operator: "اپراتور",
-  Commerce: "واحد مالی",
-  Contractor: "پیمانکار",
-};
-
 export async function loginAction(formData: FormData) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
@@ -81,10 +70,11 @@ export async function loginAction(formData: FormData) {
       data: { Last_Login: new Date() },
     });
 
-    // ساخت سشن امن (JWT) - با نقش فارسی
+    // ساخت سشن امن (JWT) - با نقش جدید دیتابیس
     const sessionToken = await createSession({
       userId: user.User_ID,
-      role: roleMap[user.Personnel?.Role || 'Operator'] || 'اپراتور',
+      // نقش مستقیماً از دیتابیس خوانده می‌شود (CEO یا User)
+      role: user.Personnel?.Role || 'User', 
       name: user.Personnel?.Full_Name || user.Username,
       image: user.Personnel?.Personal_Image_Path || null
     });

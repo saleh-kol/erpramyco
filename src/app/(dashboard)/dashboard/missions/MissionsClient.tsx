@@ -12,19 +12,6 @@ import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 
 const toPersianDate = (date: Date | string) => { if (!date) return "-"; const d = new Date(date); if (isNaN(d.getTime())) return "-"; return d.toLocaleDateString("fa-IR"); };
-const translateRole = (role: string) => {
-  if (!role) return "-";
-  const roles: any = {
-    "Factory Manager": "مدیر کارخانه", "Factory_Manager": "مدیر کارخانه",
-    "ModirNet": "مدیر نت",
-    "Production Supervisor": "سرپرست تولید", "Production_Supervisor": "سرپرست تولید",
-    "Repairer": "تعمیرکار",
-    "Operator": "اپراتور",
-    "Commerce": "بازرگانی",
-    "Contractor": "پیمانکار"
-  };
-  return roles[role] || role.replace(/_/g, ' ');
-};
 const translateCommuteType = (type: string) => { const types: any = { "CompanyVehicle": "وسیله نقلیه شرکت", "PersonalVehicle": "وسیله نقلیه شخصی", "PublicTransport": "حمل و نقل عمومی", "Taxi": "تاکسی", "Other": "سایر" }; return types[type] || type; };
 
 const formatToLocalISO = (dateObj: any) => {
@@ -102,7 +89,7 @@ export default function MissionsClient({ missions, personnel, currentStatus }: {
         .erp-modal-container { background: white; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; border-top: 4px solid #ed6e2b; animation: scaleIn 0.2s ease-out; }
         .erp-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: white; z-index: 10; border-radius: 20px 20px 0 0; }
         .erp-modal-body { padding: 24px; }
-        .erp-input { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #e2e8f0; outline: none; font-size: 14px; font-family: inherit; background-color: #f8fafc; transition: all 0.2s; box-sizing: border-box; }
+        .erp-input { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #e2e8f0; outline: none; fontSize: "14px"; font-family: inherit; background-color: #f8fafc; transition: all 0.2s; box-sizing: border-box; }
         .erp-input:focus { border-color: #ed6e2b; background-color: white; box-shadow: 0 0 0 3px rgba(237, 110, 43, 0.1); }
         .erp-btn-close { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: none; background: #f1f5f9; color: #64748b; cursor: pointer; transition: all 0.2s; }
         .erp-btn-close:hover { background: #e2e8f0; color: #0f172a; transform: rotate(90deg); }
@@ -122,7 +109,6 @@ export default function MissionsClient({ missions, personnel, currentStatus }: {
           <div style={{ display: "flex", gap: "8px" }}>
             <button onClick={() => handleTabChange("pending")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "pending" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "pending" ? "white" : "#64748b" }}>در انتظار تایید</button>
             <button onClick={() => handleTabChange("approved")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "approved" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "approved" ? "white" : "#64748b" }}>تایید شده</button>
-            {/* این دکمه را اضافه کنید */}
             <button onClick={() => handleTabChange("rejected")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "rejected" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "rejected" ? "white" : "#64748b" }}>رد شده</button>
           </div>
         </div>
@@ -145,7 +131,6 @@ export default function MissionsClient({ missions, personnel, currentStatus }: {
           </thead>
           <tbody>
             {filteredMissions.map((m: any) => {
-              // پیدا کردن نام پرسنل از لیست آرایه personnel
               const person = personnel.find((p: any) => p.Personnel_ID === m.Personnel_ID);
               return (
                 <tr key={m.Commute_ID} onClick={() => router.push(`/dashboard/missions/${m.Commute_ID}`)} style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#fffbf5"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}>
@@ -190,7 +175,8 @@ export default function MissionsClient({ missions, personnel, currentStatus }: {
                     {filteredPersonnel.map((p: any) => (
                       <div key={p.Personnel_ID} onClick={() => selectPersonnel(p)} style={{ padding: "12px 16px", cursor: "pointer", borderBottom: "1px solid #f1f5f9" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#fff7ed"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}>
                         <span style={{ fontSize: "14px", color: "#0f172a", fontWeight: 600 }}>{p.Full_Name}</span>
-                        <span style={{ fontSize: "12px", color: "#64748b", marginRight: "8px" }}>{p.Personnel_Code} - {translateRole(p.Role)}</span>
+                        {/* اصلاح نمایش نقش با جایگاه و واحد */}
+                        <span style={{ fontSize: "12px", color: "#64748b", marginRight: "8px" }}>{p.Personnel_Code} - {p.OrganizationalPosition?.Name || "بدون جایگاه"} - {p.Unit?.Name || "بدون واحد"}</span>
                       </div>
                     ))}
                   </div>

@@ -1,165 +1,444 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Calendar, Briefcase, Navigation, Users, Clock, AlertCircle, ChevronLeft } from "lucide-react";
+import {
+  Calendar,
+  Briefcase,
+  Navigation,
+  Users,
+  FileText,
+  ArrowLeft,
+  CheckCircle2,
+  Clock3,
+} from "lucide-react";
 
 const toPersianDate = (date: Date | string) => {
   if (!date) return "-";
+
   const d = new Date(date);
+
   if (isNaN(d.getTime())) return "-";
+
   return d.toLocaleDateString("fa-IR");
 };
 
-export default function ManagerDashboard({ data, user }: { data: any, user: any }) {
+export default function ManagerDashboard({
+  data,
+  user,
+}: {
+  data: any;
+  user: any;
+}) {
   const router = useRouter();
 
-  const cardStyle: React.CSSProperties = {
-    backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
-    padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)"
-  };
+  const pendingTotal =
+    data.pendingApprovals.leaves +
+    data.pendingApprovals.projects +
+    data.pendingApprovals.missions;
 
-  const approvalCardStyle = (count: number): React.CSSProperties => ({
-    ...cardStyle,
-    cursor: "pointer",
-    borderColor: count > 0 ? "#fed7aa" : "#e2e8f0",
-    backgroundColor: count > 0 ? "#fff7ed" : "white",
-    transition: "all 0.2s"
-  });
+  const approvalCards = [
+    {
+      title: "درخواست مرخصی",
+      description:
+        data.pendingApprovals.leaves > 0
+          ? "در انتظار بررسی شما"
+          : "درخواستی در انتظار نیست",
+      count: data.pendingApprovals.leaves,
+      icon: Calendar,
+      color: "blue",
+      href: "/dashboard/leave-approvals",
+    },
+    {
+      title: "اتمام پروژه",
+      description:
+        data.pendingApprovals.projects > 0
+          ? "در انتظار بررسی شما"
+          : "درخواستی در انتظار نیست",
+      count: data.pendingApprovals.projects,
+      icon: Briefcase,
+      color: "orange",
+      href: "/dashboard/projects",
+    },
+    {
+      title: "درخواست مأموریت",
+      description:
+        data.pendingApprovals.missions > 0
+          ? "در انتظار بررسی شما"
+          : "درخواستی در انتظار نیست",
+      count: data.pendingApprovals.missions,
+      icon: Navigation,
+      color: "red",
+      href: "/dashboard/missions",
+    },
+  ];
+
+  const stats = [
+    {
+      title: "پرسنل فعال",
+      description: "پرسنل سازمان",
+      value: data.stats.activePersonnel,
+      icon: Users,
+      color: "blue",
+    },
+    {
+      title: "پروژه‌های فعال",
+      description: "در حال انجام",
+      value: data.stats.totalProjects,
+      icon: Briefcase,
+      color: "orange",
+    },
+    {
+      title: "ابلاغیه‌ها",
+      description: "در انتظار انجام",
+      value: data.stats.pendingTasks,
+      icon: FileText,
+      color: "red",
+    },
+  ];
 
   return (
-    <div style={{ backgroundColor: "#f1f5f9", minHeight: "calc(100vh - 128px)", padding: "24px" }}>
-      
-      {/* خوش آمدگویی */}
-      <div style={{ marginBottom: "32px" }}>
-        <h1 style={{ margin: 0, fontSize: "26px", fontWeight: "bold", color: "#0f172a" }}>{user.name} ,خوش آمدید</h1>
-        <p style={{ margin: "8px 0 0 0", fontSize: "14px", color: "#64748b" }}>نمای کلی وضعیت کارخانه و درخواست‌های در انتظار تصمیم شما.</p>
-      </div>
+    <main className="min-h-[calc(100vh-128px)] bg-slate-50 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1600px]">
 
-      {/* بخش تاییدات در انتظار (مهم‌ترین بخش) */}
-      <h2 style={{ fontSize: "16px", fontWeight: "bold", color: "#334155", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-        <AlertCircle style={{ width: "20px", height: "20px", color: "#ed6e2b" }} /> درخواست‌های در انتظار تایید
-      </h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "24px", marginBottom: "32px" }}>
-        
-        {/* کارت مرخصی‌ها */}
-        <div style={approvalCardStyle(data.pendingApprovals.leaves)} onClick={() => router.push("/dashboard/leave-approvals")} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <div style={{ backgroundColor: "#3b82f6", padding: "10px", borderRadius: "12px" }}><Calendar style={{ width: "24px", height: "24px", color: "white" }} /></div>
-            {data.pendingApprovals.leaves > 0 && <span style={{ backgroundColor: "#ef4444", color: "white", padding: "4px 12px", borderRadius: "20px", fontSize: "14px", fontWeight: "bold" }}>{data.pendingApprovals.leaves}</span>}
-          </div>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>درخواست مرخصی</h3>
-          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: data.pendingApprovals.leaves > 0 ? "#c2410c" : "#94a3b8" }}>{data.pendingApprovals.leaves > 0 ? "نیازمند بررسی فوری" : "درخواستی وجود ندارد"}</p>
-        </div>
-
-        {/* کارت پروژه‌ها */}
-        <div style={approvalCardStyle(data.pendingApprovals.projects)} onClick={() => router.push("/dashboard/leave-approvals")} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <div style={{ backgroundColor: "#ed6e2b", padding: "10px", borderRadius: "12px" }}><Briefcase style={{ width: "24px", height: "24px", color: "white" }} /></div>
-            {data.pendingApprovals.projects > 0 && <span style={{ backgroundColor: "#ef4444", color: "white", padding: "4px 12px", borderRadius: "20px", fontSize: "14px", fontWeight: "bold" }}>{data.pendingApprovals.projects}</span>}
-          </div>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>اتمام پروژه</h3>
-          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: data.pendingApprovals.projects > 0 ? "#c2410c" : "#94a3b8" }}>{data.pendingApprovals.projects > 0 ? "نیازمند بررسی فوری" : "درخواستی وجود ندارد"}</p>
-        </div>
-
-        {/* کارت ماموریت‌ها */}
-        <div style={approvalCardStyle(data.pendingApprovals.missions)} onClick={() => router.push("/dashboard/leave-approvals")} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-3px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <div style={{ backgroundColor: "#ef4444", padding: "10px", borderRadius: "12px" }}><Navigation style={{ width: "24px", height: "24px", color: "white" }} /></div>
-            {data.pendingApprovals.missions > 0 && <span style={{ backgroundColor: "#ef4444", color: "white", padding: "4px 12px", borderRadius: "20px", fontSize: "14px", fontWeight: "bold" }}>{data.pendingApprovals.missions}</span>}
-          </div>
-          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>درخواست ماموریت</h3>
-          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: data.pendingApprovals.missions > 0 ? "#c2410c" : "#94a3b8" }}>{data.pendingApprovals.missions > 0 ? "نیازمند بررسی فوری" : "درخواستی وجود ندارد"}</p>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px", alignItems: "start" }}>
-        
-        {/* ستون راست: پروژه‌ها و آخرین فعالیت‌ها */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          
-          {/* کارت پروژه‌های در دست انجام */}
-          <div style={cardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>پروژه‌های در دست انجام</h2>
-              <button onClick={() => router.push("/dashboard/projects")} style={{ fontSize: "13px", color: "#ed6e2b", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>مشاهده همه</button>
+        {/* Header */}
+        <section className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="text-xs font-medium text-slate-500">
+                داشبورد مدیریت
+              </span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {data.activeProjects.length > 0 ? (
-                data.activeProjects.map((p: any) => (
-                  <div key={p.Project_ID} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", backgroundColor: "#f8fafc", borderRadius: "10px" }}>
+
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+              {user.name} عزیز، خوش آمدید
+            </h1>
+
+            <p className="mt-2 text-sm text-slate-500">
+              نمای کلی وضعیت سازمان و مواردی که نیاز به بررسی شما دارند.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50">
+              <Briefcase className="h-5 w-5 text-orange-500" />
+            </div>
+
+            <div>
+              <span className="block text-[11px] text-slate-400">
+                نقش کاربری
+              </span>
+              <span className="text-sm font-bold text-slate-800">
+                مدیرعامل
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* Pending approvals */}
+        <section className="mb-8">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                موارد نیازمند بررسی
+              </h2>
+              <p className="mt-1 text-xs text-slate-400">
+                درخواست‌هایی که منتظر تصمیم شما هستند
+              </p>
+            </div>
+
+            {pendingTotal > 0 && (
+              <div className="flex items-center gap-2 rounded-full border border-orange-100 bg-orange-50 px-3 py-1.5">
+                <Clock3 className="h-3.5 w-3.5 text-orange-500" />
+                <span className="text-xs font-bold text-orange-600">
+                  {pendingTotal} مورد
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {approvalCards.map((item) => {
+              const Icon = item.icon;
+              const hasPending = item.count > 0;
+
+              const iconClasses = {
+                blue: "bg-blue-50 text-blue-600",
+                orange: "bg-orange-50 text-orange-600",
+                red: "bg-red-50 text-red-600",
+              };
+
+              return (
+                <button
+                  key={item.title}
+                  onClick={() => router.push(item.href)}
+                  className={`
+                    group relative overflow-hidden rounded-2xl border
+                    bg-white p-5 text-right transition-all duration-300
+                    hover:-translate-y-1 hover:shadow-xl
+                    ${
+                      hasPending
+                        ? "border-orange-100 shadow-sm"
+                        : "border-slate-200 shadow-sm"
+                    }
+                  `}
+                >
+                  {hasPending && (
+                    <div className="absolute right-0 top-0 h-1 w-full bg-gradient-to-l from-orange-500 to-orange-300" />
+                  )}
+
+                  <div className="mb-5 flex items-center justify-between">
+                    <div
+                      className={`
+                        flex h-12 w-12 items-center justify-center rounded-2xl
+                        ${iconClasses[item.color as keyof typeof iconClasses]}
+                      `}
+                    >
+                      <Icon className="h-6 w-6" />
+                    </div>
+
+                    {hasPending ? (
+                      <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-red-500 px-2 text-sm font-extrabold text-white shadow-sm">
+                        {item.count}
+                      </span>
+                    ) : (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    )}
+                  </div>
+
+                  <div className="flex items-end justify-between gap-4">
                     <div>
-                      <span style={{ fontSize: "14px", fontWeight: 600, color: "#334155", display: "block" }}>{p.Project_Name}</span>
-                      <span style={{ fontSize: "12px", color: "#94a3b8" }}>👑 {p.Project_Leader?.Full_Name || "تعیین نشده"}</span>
+                      <h3 className="text-[15px] font-bold text-slate-900">
+                        {item.title}
+                      </h3>
+
+                      <p
+                        className={`mt-1.5 text-xs font-medium ${
+                          hasPending
+                            ? "text-orange-600"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        {item.description}
+                      </p>
                     </div>
-                    <div style={{ textAlign: "left" }}>
-                      <span style={{ fontSize: "12px", color: "#64748b", display: "block" }}>مهلت پایان:</span>
-                      <span style={{ fontSize: "13px", fontWeight: "bold", color: "#0f172a" }}>{toPersianDate(p.End_Date)}</span>
-                    </div>
+
+                    <ArrowLeft className="h-4 w-4 shrink-0 text-slate-300 transition-all duration-300 group-hover:-translate-x-1 group-hover:text-slate-500" />
                   </div>
-                ))
-              ) : (
-                <p style={{ fontSize: "14px", color: "#94a3b8", textAlign: "center" }}>پروژه فعالی وجود ندارد.</p>
-              )}
-            </div>
+                </button>
+              );
+            })}
           </div>
+        </section>
 
-          {/* کارت آخرین فعالیت‌های ثبت شده */}
-          <div style={cardStyle}>
-            <h2 style={{ margin: "0 0 16px 0", fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>آخرین فعالیت‌های ثبت شده</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {data.recentReports.length > 0 ? (
-                data.recentReports.map((r: any) => (
-                  <div key={r.Report_ID} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px", backgroundColor: "#f8fafc", borderRadius: "10px" }}>
-                    <div style={{ backgroundColor: "#e2e8f0", width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontWeight: "bold", fontSize: "14px" }}>
-                      {r.Personnel?.Full_Name?.charAt(0) || "?"}
+        {/* Main grid */}
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_380px]">
+
+          {/* Right column */}
+          <div className="space-y-6">
+
+            {/* Active projects */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    پروژه‌های در دست انجام
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-400">
+                    وضعیت پروژه‌های فعال سازمان
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => router.push("/dashboard/projects")}
+                  className="group flex items-center gap-1.5 text-xs font-bold text-blue-600 transition-colors hover:text-blue-700"
+                >
+                  مشاهده همه
+                  <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-1" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {data.activeProjects.length > 0 ? (
+                  data.activeProjects.map((p: any) => (
+                    <div
+                      key={p.Project_ID}
+                      className="group flex flex-col gap-4 rounded-xl border border-slate-100 bg-slate-50/70 p-4 transition-all duration-200 hover:border-slate-200 hover:bg-white hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="mb-2 flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-blue-500" />
+
+                          <span className="truncate text-sm font-bold text-slate-800">
+                            {p.Project_Name}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                          <Users className="h-3.5 w-3.5" />
+                          <span>
+                            {p.Project_Leader?.Full_Name || "تعیین نشده"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 rounded-xl border border-orange-100 bg-orange-50 px-4 py-2.5">
+                        <span className="mb-0.5 block text-[10px] font-medium text-orange-500">
+                          مهلت پایان
+                        </span>
+
+                        <span className="text-xs font-extrabold text-slate-800">
+                          {toPersianDate(
+                            p.Deadline_Date || p.End_Date
+                          )}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", display: "block" }}>{r.Personnel?.Full_Name || "ناشناخته"}</span>
-                      <span style={{ fontSize: "12px", color: "#64748b" }}>ثبت فعالیت برای {toPersianDate(r.Report_Date)}</span>
-                    </div>
-                    <span style={{ fontSize: "12px", color: "#16a34a", fontWeight: "bold" }}>{Number(r.Work_Hours || 0).toFixed(1)} ساعت</span>
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
+                    <Briefcase className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+                    <p className="text-sm font-medium text-slate-400">
+                      پروژه فعالی وجود ندارد.
+                    </p>
                   </div>
-                ))
-              ) : (
-                <p style={{ fontSize: "14px", color: "#94a3b8", textAlign: "center" }}>فعالیتی ثبت نشده است.</p>
-              )}
-            </div>
+                )}
+              </div>
+            </section>
+
+            {/* Recent activities */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-6">
+                <h2 className="text-lg font-bold text-slate-900">
+                  آخرین فعالیت‌ها
+                </h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  آخرین گزارش‌های ثبت‌شده توسط پرسنل
+                </p>
+              </div>
+
+              <div>
+                {data.recentReports.length > 0 ? (
+                  data.recentReports.map((r: any, index: number) => (
+                    <div
+                      key={r.Report_ID}
+                      className={`
+                        flex items-center gap-3 py-4
+                        ${
+                          index !== data.recentReports.length - 1
+                            ? "border-b border-slate-100"
+                            : ""
+                        }
+                      `}
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-extrabold text-slate-500">
+                        {r.Personnel?.Full_Name?.charAt(0) || "?"}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-bold text-slate-800">
+                          {r.Personnel?.Full_Name || "ناشناخته"}
+                        </span>
+
+                        <span className="mt-1 block text-xs text-slate-400">
+                          ثبت فعالیت در تاریخ{" "}
+                          {toPersianDate(r.Report_Date)}
+                        </span>
+                      </div>
+
+                      <div className="shrink-0 rounded-lg bg-emerald-50 px-3 py-1.5">
+                        <span className="text-xs font-bold text-emerald-600">
+                          {Number(r.Work_Hours || 0).toFixed(1)} ساعت
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-10 text-center">
+                    <FileText className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+                    <p className="text-sm text-slate-400">
+                      فعالیتی ثبت نشده است.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
+
+          {/* Left column - statistics */}
+          <section className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-slate-900">
+                آمار سریع
+              </h2>
+              <p className="mt-1 text-xs text-slate-400">
+                نمای کلی از وضعیت سازمان
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {stats.map((item) => {
+                const Icon = item.icon;
+
+                const iconClasses = {
+                  blue: "bg-blue-50 text-blue-600",
+                  orange: "bg-orange-50 text-orange-600",
+                  red: "bg-red-50 text-red-600",
+                };
+
+                return (
+                  <div
+                    key={item.title}
+                    className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-4 transition-colors hover:bg-slate-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`
+                          flex h-11 w-11 items-center justify-center rounded-xl
+                          ${iconClasses[item.color as keyof typeof iconClasses]}
+                        `}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+
+                      <div>
+                        <span className="block text-sm font-bold text-slate-800">
+                          {item.title}
+                        </span>
+
+                        <span className="mt-1 block text-[11px] text-slate-400">
+                          {item.description}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span className="text-2xl font-extrabold tracking-tight text-slate-900">
+                      {item.value}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Small summary */}
+            <div className="mt-5 rounded-xl bg-slate-900 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-400">
+                  وضعیت درخواست‌ها
+                </span>
+
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              </div>
+
+              <p className="text-sm font-bold text-white">
+                {pendingTotal > 0
+                  ? `${pendingTotal} درخواست در انتظار بررسی`
+                  : "همه درخواست‌ها بررسی شده‌اند"}
+              </p>
+            </div>
+          </section>
         </div>
-
-        {/* ستون چپ: آمار سریع */}
-        <div style={cardStyle}>
-          <h2 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>آمار سریع</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", backgroundColor: "#f8fafc", borderRadius: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ backgroundColor: "#eff6ff", padding: "8px", borderRadius: "10px" }}><Users style={{ width: "20px", height: "20px", color: "#3b82f6" }} /></div>
-                <span style={{ fontSize: "14px", fontWeight: 600, color: "#334155" }}>پرسنل فعال</span>
-              </div>
-              <span style={{ fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>{data.stats.activePersonnel}</span>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", backgroundColor: "#f8fafc", borderRadius: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ backgroundColor: "#fff7ed", padding: "8px", borderRadius: "10px" }}><Briefcase style={{ width: "20px", height: "20px", color: "#ed6e2b" }} /></div>
-                <span style={{ fontSize: "14px", fontWeight: 600, color: "#334155" }}>پروژه‌های فعال</span>
-              </div>
-              <span style={{ fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>{data.stats.totalProjects}</span>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", backgroundColor: "#f8fafc", borderRadius: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ backgroundColor: "#fef2f2", padding: "8px", borderRadius: "10px" }}><Clock style={{ width: "20px", height: "20px", color: "#ef4444" }} /></div>
-                <span style={{ fontSize: "14px", fontWeight: 600, color: "#334155" }}>ابلاغیه‌های صادر شده</span>
-              </div>
-              <span style={{ fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>{data.stats.pendingTasks}</span>
-            </div>
-
-          </div>
-        </div>
-
       </div>
-    </div>
+    </main>
   );
 }

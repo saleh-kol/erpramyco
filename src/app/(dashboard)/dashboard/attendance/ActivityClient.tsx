@@ -1,217 +1,795 @@
 "use client";
 
 import { useState } from "react";
+
 import { createManualActivityAction } from "@/actions/activity";
-import { Play, UserCircle2, X, Save, CheckCircle, Calendar, Clock } from "lucide-react";
+
+import {
+  Play,
+  UserCircle2,
+  X,
+  Save,
+  CheckCircle,
+  Clock,
+} from "lucide-react";
 
 const toPersianTime = (timeStr: Date | string) => {
   if (!timeStr) return "-";
+
   const d = new Date(timeStr);
+
   if (isNaN(d.getTime())) return "-";
-  return d.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
+
+  return d.toLocaleTimeString("fa-IR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
-export default function ActivityClient({ user, activeActivity, types, locations, projects, tasks, missions }: any) {
+export default function ActivityClient({
+  user,
+  activeActivity,
+  types,
+  locations,
+  projects,
+  tasks,
+  missions,
+}: any) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [category, setCategory] = useState("job");
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
-    setFormError(null);
-    const formData = new FormData(e.currentTarget);
-    formData.append('category', category);
 
-    const result = await createManualActivityAction(formData);
-    if (result?.error) {
-      setFormError(result.error);
-    } else if (result?.success) {
-      setIsModalOpen(false);
-      setToast("فعالیت با موفقیت ثبت شد");
-      setTimeout(() => setToast(null), 3000);
+    setFormError(null);
+
+    const formData = new FormData(e.currentTarget);
+
+    formData.append("category", category);
+
+    try {
+      const result = await createManualActivityAction(formData);
+
+      if (result?.error) {
+        setFormError(result.error);
+        return;
+      }
+
+      if (result?.success) {
+        setIsModalOpen(false);
+        setToast("فعالیت با موفقیت ثبت شد");
+
+        setTimeout(() => {
+          setToast(null);
+        }, 3000);
+      }
+    } catch (error) {
+      console.error(error);
+      setFormError("خطایی هنگام ثبت فعالیت رخ داد.");
     }
   };
 
-  const todayStr = new Date().toLocaleDateString('fa-IR');
+  const todayStr = new Date().toLocaleDateString("fa-IR");
 
   return (
-    <div style={{ backgroundColor: "#f1f5f9", minHeight: "calc(100vh - 128px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-      <style>{`
-        .erp-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn 0.2s ease-out; }
-        .erp-modal-container { background: white; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; max-width: 550px; max-height: 90vh; overflow-y: auto; border-top: 4px solid #ed6e2b; animation: scaleIn 0.2s ease-out; }
-        .erp-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: white; z-index: 10; border-radius: 20px 20px 0 0; }
-        .erp-modal-body { padding: 24px; }
-        .erp-input { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #e2e8f0; outline: none; font-size: 14px; font-family: inherit; background-color: #f8fafc; transition: all 0.2s; box-sizing: border-box; }
-        .erp-input:focus { border-color: #ed6e2b; background-color: white; box-shadow: 0 0 0 3px rgba(237, 110, 43, 0.1); }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-      `}</style>
+    <div className="min-h-[calc(100vh-128px)] bg-slate-50 p-4 sm:p-6">
 
-      <div style={{ backgroundColor: "white", borderRadius: "24px", padding: "40px", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)", maxWidth: "450px", width: "100%", textAlign: "center" }}>
-        <div style={{ width: "80px", height: "80px", borderRadius: "50%", overflow: "hidden", backgroundColor: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto", border: "3px solid #ffedd5" }}>
-          {user.image ? <img src={user.image} alt={user.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UserCircle2 style={{ width: "50px", height: "50px", color: "#cbd5e1" }} />}
-        </div>
-        
-        <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "bold", color: "#0f172a" }}>{user.name}</h1>
-        <p style={{ margin: "6px 0 24px 0", fontSize: "13px", color: "#64748b" }}>ثبت فعالیت روزانه ({todayStr})</p>
+      {/* Main Card */}
+      <div className="mx-auto flex min-h-[calc(100vh-176px)] max-w-[1100px] items-center justify-center">
 
-        {activeActivity ? (
-          <div style={{ backgroundColor: "#f0fdf4", padding: "16px", borderRadius: "12px", border: "1px solid #bbf7d0", marginBottom: "24px", textAlign: "right" }}>
-            <p style={{ margin: "0 0 8px 0", fontSize: "13px", color: "#166534", fontWeight: 600 }}>فعالیت ثبت شده امروز (در حال انجام):</p>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#0f172a" }}>
-              <Clock style={{ width: "16px", height: "16px", color: "#16a34a" }} />
-              ورود: {toPersianTime(activeActivity.Check_In)} - خروج: {activeActivity.Check_Out ? toPersianTime(activeActivity.Check_Out) : "ثبت نشده"}
+        <div className="w-full max-w-[480px] rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+
+          {/* User */}
+          <div className="text-center">
+
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-4 border-orange-50 bg-slate-100">
+              {user?.image ? (
+                <img
+                  src={user.image}
+                  alt={user.name || "پروفایل"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <UserCircle2 className="h-12 w-12 text-slate-300" />
+              )}
             </div>
-          </div>
-        ) : null}
 
-        <button onClick={() => setIsModalOpen(true)} style={{ width: "100%", padding: "14px", backgroundColor: "#ed6e2b", color: "white", border: "none", borderRadius: "12px", cursor: "pointer", fontWeight: "bold", fontSize: "16px", boxShadow: "0 4px 6px rgba(237,110,43,0.2)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-          <Play style={{ width: "20px", height: "20px" }} /> ثبت فعالیت جدید
-        </button>
+            <h1 className="text-xl font-extrabold text-slate-900 sm:text-2xl">
+              {user?.name}
+            </h1>
+
+            <p className="mt-1.5 text-xs text-slate-500">
+              ثبت فعالیت روزانه ({todayStr})
+            </p>
+          </div>
+
+          {/* Active Activity */}
+          {activeActivity && (
+            <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="mb-2 text-right text-xs font-bold text-emerald-700">
+                فعالیت ثبت شده امروز
+              </p>
+
+              <div className="flex items-center gap-2 text-right text-sm text-slate-700">
+                <Clock className="h-4 w-4 shrink-0 text-emerald-600" />
+
+                <span>
+                  ورود:{" "}
+                  {toPersianTime(activeActivity.Check_In)}
+                  {" - "}
+                  خروج:{" "}
+                  {activeActivity.Check_Out
+                    ? toPersianTime(activeActivity.Check_Out)
+                    : "ثبت نشده"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Open Modal */}
+          <button
+            type="button"
+            onClick={() => {
+              setFormError(null);
+              setIsModalOpen(true);
+            }}
+            className="
+              mt-6 flex w-full items-center
+              justify-center gap-2
+              rounded-xl
+              bg-[#ed6e2b]
+              px-5 py-3.5
+              text-sm font-bold text-white
+              shadow-sm shadow-orange-200
+              transition-all
+              hover:bg-[#d95f20]
+              hover:shadow-md
+              active:scale-[0.99]
+            "
+          >
+            <Play className="h-5 w-5" />
+            ثبت فعالیت جدید
+          </button>
+        </div>
       </div>
 
-      {/* پاپ‌آپ ثبت فعالیت دستی */}
+      {/* Modal */}
       {isModalOpen && (
-        <div className="erp-modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="erp-modal-container" onClick={(e) => e.stopPropagation()}>
-            <div className="erp-modal-header">
-              <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "bold", color: "#0f172a" }}>ثبت فعالیت برای امروز</h2>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: "transparent", border: "none", cursor: "pointer" }}><X style={{ color: "#64748b" }} /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="erp-modal-body" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              
-              {/* تاریخ و ساعت‌ها */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>تاریخ</label>
-                  <input type="text" value={todayStr} disabled className="erp-input" style={{ textAlign: "center", backgroundColor: "#f1f5f9" }} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>ساعت ورود *</label>
-                  <input 
-                    name="checkIn" 
-                    type="text" 
-                    required 
-                    pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" 
-                    title="ساعت را به صورت ۲۴ ساعته وارد کنید. مثال: 14:30 یا 08:15"
-                    className="erp-input" 
-                    style={{ textAlign: "center", direction: "ltr" }} 
-                    placeholder="14:30" 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>ساعت خروج *</label>
-                  <input 
-                    name="checkOut" 
-                    type="text" 
-                    required 
-                    pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" 
-                    title="ساعت را به صورت ۲۴ ساعته وارد کنید. مثال: 18:45 یا 09:05"
-                    className="erp-input" 
-                    style={{ textAlign: "center", direction: "ltr" }} 
-                    placeholder="18:45" 
-                  />
-                </div>
-              </div>
+        <div
+          className="
+            fixed inset-0 z-50
+            flex items-center justify-center
+            bg-slate-900/60
+            p-4
+            backdrop-blur-sm
+          "
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div
+            className="
+              flex max-h-[90vh] w-full max-w-[560px]
+              flex-col overflow-hidden
+              rounded-2xl
+              border-t-4 border-[#ed6e2b]
+              bg-white
+              shadow-2xl
+            "
+            onClick={(e) => e.stopPropagation()}
+          >
 
-              {/* شرح انجام فعالیت */}
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>شرح انجام فعالیت *</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "6px", padding: "12px", border: `1px solid ${category === 'job' ? '#ed6e2b' : '#e2e8f0'}`, borderRadius: "10px", cursor: "pointer", fontSize: "13px", backgroundColor: category === 'job' ? '#fff7ed' : 'white' }}>
-                    <input type="radio" name="categoryRadio" value="job" checked={category === 'job'} onChange={() => setCategory('job')} style={{ display: "none" }} /> شرح وظیفه
-                  </label>
-                  <div>
-                    <label style={{ display: "flex", alignItems: "center", gap: "6px", padding: "12px", border: `1px solid ${category === 'task' ? '#ed6e2b' : '#e2e8f0'}`, borderRadius: "10px", cursor: tasks.length > 0 ? 'pointer' : 'not-allowed', fontSize: "13px", backgroundColor: category === 'task' ? '#fff7ed' : 'white', opacity: tasks.length > 0 ? 1 : 0.5 }}>
-                      <input type="radio" value="task" disabled={tasks.length === 0} checked={category === 'task'} onChange={() => setCategory('task')} style={{ display: "none" }} /> دستور مدیر
-                    </label>
-                    {tasks.length === 0 && <p style={{ fontSize: "10px", color: "#ef4444", margin: "4px 0 0 4px" }}>ابلاغیه ندارید</p>}
-                  </div>
-                  <div>
-                    <label style={{ display: "flex", alignItems: "center", gap: "6px", padding: "12px", border: `1px solid ${category === 'mission' ? '#ed6e2b' : '#e2e8f0'}`, borderRadius: "10px", cursor: missions.length > 0 ? 'pointer' : 'not-allowed', fontSize: "13px", backgroundColor: category === 'mission' ? '#fff7ed' : 'white', opacity: missions.length > 0 ? 1 : 0.5 }}>
-                      <input type="radio" value="mission" disabled={missions.length === 0} checked={category === 'mission'} onChange={() => setCategory('mission')} style={{ display: "none" }} /> ماموریت
-                    </label>
-                    {missions.length === 0 && <p style={{ fontSize: "10px", color: "#ef4444", margin: "4px 0 0 4px" }}>ماموریتی ندارید</p>}
-                  </div>
-                  <div>
-                    <label style={{ display: "flex", alignItems: "center", gap: "6px", padding: "12px", border: `1px solid ${category === 'project' ? '#ed6e2b' : '#e2e8f0'}`, borderRadius: "10px", cursor: projects.length > 0 ? 'pointer' : 'not-allowed', fontSize: "13px", backgroundColor: category === 'project' ? '#fff7ed' : 'white', opacity: projects.length > 0 ? 1 : 0.5 }}>
-                      <input type="radio" value="project" disabled={projects.length === 0} checked={category === 'project'} onChange={() => setCategory('project')} style={{ display: "none" }} /> پروژه
-                    </label>
-                    {projects.length === 0 && <p style={{ fontSize: "10px", color: "#ef4444", margin: "4px 0 0 4px" }}>پروژه‌ای ندارید</p>}
-                  </div>
-                </div>
-              </div>
-
-              {category === 'project' && projects.length > 0 && (
-                <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>انتخاب پروژه *</label>
-                  <select name="projectId" required className="erp-input">
-                    {projects.map((p: any) => <option key={p.Project_ID} value={p.Project_ID}>{p.Project_Name}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {category === 'task' && tasks.length > 0 && (
-                <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>انتخاب ابلاغیه *</label>
-                  <select name="taskId" required className="erp-input">
-                    {tasks.map((t: any) => <option key={t.Task_ID} value={t.Task_ID}>{t.Title}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {category === 'mission' && missions.length > 0 && (
-                <div>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>انتخاب ماموریت *</label>
-                  <select name="missionId" required className="erp-input">
-                    {missions.map((m: any) => <option key={m.Commute_ID} value={m.Commute_ID}>{m.Destination}</option>)}
-                  </select>
-                </div>
-              )}
+            {/* Modal Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
 
               <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>نوع فعالیت *</label>
-                <select name="workTypeId" required className="erp-input">
-                  {types.map((t: any) => <option key={t.Work_Type_ID} value={t.Work_Type_ID}>{t.Work_Type_Name}</option>)}
-                </select>
+                <span className="text-[10px] font-semibold text-slate-400">
+                  ثبت فعالیت
+                </span>
+
+                <h2 className="mt-0.5 text-base font-extrabold text-slate-900">
+                  ثبت فعالیت برای امروز
+                </h2>
               </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>محل فعالیت *</label>
-                <select name="locationId" required className="erp-input">
-                  {locations.map((l: any) => <option key={l.Location_ID} value={l.Location_ID}>{l.Location_Name}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>ضریب سختی کار (۱ تا ۱۰) *</label>
-                <input name="difficulty" type="number" min="1" max="10" required defaultValue="5" className="erp-input" />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>شرح کار انجام شده *</label>
-                <textarea name="description" rows={2} required className="erp-input" style={{ resize: "vertical" }} placeholder="توضیحاتی در مورد فعالیت خود وارد کنید..."></textarea>
-              </div>
-
-              {formError && (
-                <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "12px 16px", borderRadius: "10px", fontSize: "14px", fontWeight: 600 }}>{formError}</div>
-              )}
-
-              <button type="submit" style={{ padding: "14px", backgroundColor: "#16a34a", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: "bold", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginTop: "8px" }}>
-                <Save style={{ width: "18px", height: "18px" }} /> ثبت فعالیت
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                aria-label="بستن"
+                className="
+                  flex h-9 w-9 items-center justify-center
+                  rounded-lg
+                  text-slate-400
+                  transition-all
+                  hover:bg-slate-100
+                  hover:text-slate-700
+                "
+              >
+                <X className="h-5 w-5" />
               </button>
+            </div>
+
+            {/* Modal Body */}
+            <form
+              onSubmit={handleSubmit}
+              className="overflow-y-auto p-5 sm:p-6"
+            >
+
+              <div className="space-y-5">
+
+                {/* Date & Times */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-slate-600">
+                      تاریخ
+                    </label>
+
+                    <input
+                      type="text"
+                      value={todayStr}
+                      disabled
+                      className="
+                        w-full rounded-xl
+                        border border-slate-200
+                        bg-slate-100
+                        px-3 py-2.5
+                        text-center text-sm
+                        text-slate-500
+                        outline-none
+                      "
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-slate-600">
+                      ساعت ورود *
+                    </label>
+
+                    <input
+                      name="checkIn"
+                      type="text"
+                      required
+                      pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]"
+                      title="ساعت را به صورت ۲۴ ساعته وارد کنید. مثال: 14:30 یا 08:15"
+                      placeholder="14:30"
+                      dir="ltr"
+                      className="
+                        w-full rounded-xl
+                        border border-slate-200
+                        bg-slate-50
+                        px-3 py-2.5
+                        text-center text-sm
+                        text-slate-700
+                        outline-none
+                        transition-all
+                        placeholder:text-slate-400
+                        focus:border-[#ed6e2b]
+                        focus:bg-white
+                        focus:ring-4
+                        focus:ring-orange-100
+                      "
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-slate-600">
+                      ساعت خروج *
+                    </label>
+
+                    <input
+                      name="checkOut"
+                      type="text"
+                      required
+                      pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]"
+                      title="ساعت را به صورت ۲۴ ساعته وارد کنید. مثال: 18:45 یا 09:05"
+                      placeholder="18:45"
+                      dir="ltr"
+                      className="
+                        w-full rounded-xl
+                        border border-slate-200
+                        bg-slate-50
+                        px-3 py-2.5
+                        text-center text-sm
+                        text-slate-700
+                        outline-none
+                        transition-all
+                        placeholder:text-slate-400
+                        focus:border-[#ed6e2b]
+                        focus:bg-white
+                        focus:ring-4
+                        focus:ring-orange-100
+                      "
+                    />
+                  </div>
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-slate-600">
+                    شرح انجام فعالیت *
+                  </label>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+
+                    {/* Job */}
+                    <label
+                      className={`
+                        cursor-pointer rounded-xl border p-3
+                        transition-all
+                        ${
+                          category === "job"
+                            ? "border-orange-300 bg-orange-50 ring-2 ring-orange-100"
+                            : "border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40"
+                        }
+                      `}
+                    >
+                      <input
+                        type="radio"
+                        name="categoryRadio"
+                        value="job"
+                        checked={category === "job"}
+                        onChange={() => setCategory("job")}
+                        className="sr-only"
+                      />
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`
+                            h-4 w-4 rounded-full border-2
+                            ${
+                              category === "job"
+                                ? "border-[#ed6e2b] bg-[#ed6e2b] ring-2 ring-orange-100"
+                                : "border-slate-300"
+                            }
+                          `}
+                        />
+
+                        <span className="text-xs font-bold text-slate-700">
+                          شرح وظیفه
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* Task */}
+                    <div>
+                      <label
+                        className={`
+                          block rounded-xl border p-3
+                          transition-all
+                          ${
+                            tasks.length === 0
+                              ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-50"
+                              : category === "task"
+                                ? "cursor-pointer border-orange-300 bg-orange-50 ring-2 ring-orange-100"
+                                : "cursor-pointer border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40"
+                          }
+                        `}
+                      >
+                        <input
+                          type="radio"
+                          name="categoryRadio"
+                          value="task"
+                          disabled={tasks.length === 0}
+                          checked={category === "task"}
+                          onChange={() => setCategory("task")}
+                          className="sr-only"
+                        />
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`
+                              h-4 w-4 rounded-full border-2
+                              ${
+                                category === "task"
+                                  ? "border-[#ed6e2b] bg-[#ed6e2b] ring-2 ring-orange-100"
+                                  : "border-slate-300"
+                              }
+                            `}
+                          />
+
+                          <span className="text-xs font-bold text-slate-700">
+                            دستور مدیر
+                          </span>
+                        </div>
+                      </label>
+
+                      {tasks.length === 0 && (
+                        <p className="mt-1.5 px-1 text-[10px] text-red-500">
+                          ابلاغیه ندارید
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Mission */}
+                    <div>
+                      <label
+                        className={`
+                          block rounded-xl border p-3
+                          transition-all
+                          ${
+                            missions.length === 0
+                              ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-50"
+                              : category === "mission"
+                                ? "cursor-pointer border-orange-300 bg-orange-50 ring-2 ring-orange-100"
+                                : "cursor-pointer border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40"
+                          }
+                        `}
+                      >
+                        <input
+                          type="radio"
+                          name="categoryRadio"
+                          value="mission"
+                          disabled={missions.length === 0}
+                          checked={category === "mission"}
+                          onChange={() => setCategory("mission")}
+                          className="sr-only"
+                        />
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`
+                              h-4 w-4 rounded-full border-2
+                              ${
+                                category === "mission"
+                                  ? "border-[#ed6e2b] bg-[#ed6e2b] ring-2 ring-orange-100"
+                                  : "border-slate-300"
+                              }
+                            `}
+                          />
+
+                          <span className="text-xs font-bold text-slate-700">
+                            ماموریت
+                          </span>
+                        </div>
+                      </label>
+
+                      {missions.length === 0 && (
+                        <p className="mt-1.5 px-1 text-[10px] text-red-500">
+                          ماموریتی ندارید
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Project */}
+                    <div>
+                      <label
+                        className={`
+                          block rounded-xl border p-3
+                          transition-all
+                          ${
+                            projects.length === 0
+                              ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-50"
+                              : category === "project"
+                                ? "cursor-pointer border-orange-300 bg-orange-50 ring-2 ring-orange-100"
+                                : "cursor-pointer border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40"
+                          }
+                        `}
+                      >
+                        <input
+                          type="radio"
+                          name="categoryRadio"
+                          value="project"
+                          disabled={projects.length === 0}
+                          checked={category === "project"}
+                          onChange={() => setCategory("project")}
+                          className="sr-only"
+                        />
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`
+                              h-4 w-4 rounded-full border-2
+                              ${
+                                category === "project"
+                                  ? "border-[#ed6e2b] bg-[#ed6e2b] ring-2 ring-orange-100"
+                                  : "border-slate-300"
+                              }
+                            `}
+                          />
+
+                          <span className="text-xs font-bold text-slate-700">
+                            پروژه
+                          </span>
+                        </div>
+                      </label>
+
+                      {projects.length === 0 && (
+                        <p className="mt-1.5 px-1 text-[10px] text-red-500">
+                          پروژه‌ای ندارید
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Project */}
+                {category === "project" && projects.length > 0 && (
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-slate-600">
+                      انتخاب پروژه *
+                    </label>
+
+                    <select
+                      name="projectId"
+                      required
+                      className="
+                        w-full rounded-xl
+                        border border-slate-200
+                        bg-slate-50
+                        px-3 py-2.5
+                        text-sm text-slate-700
+                        outline-none
+                        transition-all
+                        focus:border-[#ed6e2b]
+                        focus:bg-white
+                        focus:ring-4
+                        focus:ring-orange-100
+                      "
+                    >
+                      {projects.map((project: any) => (
+                        <option
+                          key={project.Project_ID}
+                          value={project.Project_ID}
+                        >
+                          {project.Project_Name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Task */}
+                {category === "task" && tasks.length > 0 && (
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-slate-600">
+                      انتخاب ابلاغیه *
+                    </label>
+
+                    <select
+                      name="taskId"
+                      required
+                      className="
+                        w-full rounded-xl
+                        border border-slate-200
+                        bg-slate-50
+                        px-3 py-2.5
+                        text-sm text-slate-700
+                        outline-none
+                        transition-all
+                        focus:border-[#ed6e2b]
+                        focus:bg-white
+                        focus:ring-4
+                        focus:ring-orange-100
+                      "
+                    >
+                      {tasks.map((task: any) => (
+                        <option
+                          key={task.Task_ID}
+                          value={task.Task_ID}
+                        >
+                          {task.Title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Mission */}
+                {category === "mission" && missions.length > 0 && (
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-slate-600">
+                      انتخاب ماموریت *
+                    </label>
+
+                    <select
+                      name="missionId"
+                      required
+                      className="
+                        w-full rounded-xl
+                        border border-slate-200
+                        bg-slate-50
+                        px-3 py-2.5
+                        text-sm text-slate-700
+                        outline-none
+                        transition-all
+                        focus:border-[#ed6e2b]
+                        focus:bg-white
+                        focus:ring-4
+                        focus:ring-orange-100
+                      "
+                    >
+                      {missions.map((mission: any) => (
+                        <option
+                          key={mission.Commute_ID}
+                          value={mission.Commute_ID}
+                        >
+                          {mission.Destination}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Work Type */}
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-slate-600">
+                    نوع فعالیت *
+                  </label>
+
+                  <select
+                    name="workTypeId"
+                    required
+                    className="
+                      w-full rounded-xl
+                      border border-slate-200
+                      bg-slate-50
+                      px-3 py-2.5
+                      text-sm text-slate-700
+                      outline-none
+                      transition-all
+                      focus:border-[#ed6e2b]
+                      focus:bg-white
+                      focus:ring-4
+                      focus:ring-orange-100
+                    "
+                  >
+                    {types.map((type: any) => (
+                      <option
+                        key={type.Work_Type_ID}
+                        value={type.Work_Type_ID}
+                      >
+                        {type.Work_Type_Name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Location */}
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-slate-600">
+                    محل فعالیت *
+                  </label>
+
+                  <select
+                    name="locationId"
+                    required
+                    className="
+                      w-full rounded-xl
+                      border border-slate-200
+                      bg-slate-50
+                      px-3 py-2.5
+                      text-sm text-slate-700
+                      outline-none
+                      transition-all
+                      focus:border-[#ed6e2b]
+                      focus:bg-white
+                      focus:ring-4
+                      focus:ring-orange-100
+                    "
+                  >
+                    {locations.map((location: any) => (
+                      <option
+                        key={location.Location_ID}
+                        value={location.Location_ID}
+                      >
+                        {location.Location_Name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Difficulty */}
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-slate-600">
+                    ضریب سختی کار (۱ تا ۱۰) *
+                  </label>
+
+                  <input
+                    name="difficulty"
+                    type="number"
+                    min="1"
+                    max="10"
+                    required
+                    defaultValue="5"
+                    className="
+                      w-full rounded-xl
+                      border border-slate-200
+                      bg-slate-50
+                      px-3 py-2.5
+                      text-sm text-slate-700
+                      outline-none
+                      transition-all
+                      focus:border-[#ed6e2b]
+                      focus:bg-white
+                      focus:ring-4
+                      focus:ring-orange-100
+                    "
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-slate-600">
+                    شرح کار انجام شده *
+                  </label>
+
+                  <textarea
+                    name="description"
+                    rows={3}
+                    required
+                    placeholder="توضیحاتی در مورد فعالیت خود وارد کنید..."
+                    className="
+                      w-full resize-y rounded-xl
+                      border border-slate-200
+                      bg-slate-50
+                      px-3 py-2.5
+                      text-sm text-slate-700
+                      outline-none
+                      transition-all
+                      placeholder:text-slate-400
+                      focus:border-[#ed6e2b]
+                      focus:bg-white
+                      focus:ring-4
+                      focus:ring-orange-100
+                    "
+                  />
+                </div>
+
+                {/* Error */}
+                {formError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold leading-6 text-red-700">
+                    {formError}
+                  </div>
+                )}
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  className="
+                    flex w-full items-center
+                    justify-center gap-2
+                    rounded-xl
+                    bg-[#ed6e2b]
+                    px-5 py-3.5
+                    text-sm font-bold text-white
+                    shadow-sm shadow-orange-200
+                    transition-all
+                    hover:bg-[#d95f20]
+                    hover:shadow-md
+                    active:scale-[0.99]
+                  "
+                >
+                  <Save className="h-5 w-5" />
+                  ثبت فعالیت
+                </button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* Toast */}
       {toast && (
-        <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#0f172a', color: 'white', padding: '12px 24px', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500, animation: 'slideUp 0.3s ease-out' }}>
-          <CheckCircle style={{ width: '20px', height: '20px', color: '#10b981' }} />{toast}
+        <div
+          className="
+            fixed bottom-6 left-1/2 z-[100]
+            flex -translate-x-1/2
+            items-center gap-2
+            rounded-xl
+            bg-slate-900
+            px-4 py-3
+            text-sm font-medium text-white
+            shadow-xl
+          "
+        >
+          <CheckCircle className="h-5 w-5 text-emerald-400" />
+          {toast}
         </div>
       )}
     </div>
   );
 }
+

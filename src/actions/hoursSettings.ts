@@ -8,6 +8,8 @@ export async function getPersonnelForHours() {
   const personnelData = await prisma.personnel.findMany({
     where: { IsActive: true },
     include: {
+      OrganizationalPosition: true, // <--- این خط اضافه شد
+      Unit: true,                   // <--- این خط اضافه شد
       // نام دقیق رابطه در پراسیما
       PR_Personnel_Finance_PR_Personnel_Finance_Personnel_IDToPersonnel: {
         where: { Is_Active: true },

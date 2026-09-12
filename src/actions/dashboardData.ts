@@ -71,10 +71,11 @@ export async function getEmployeeDashboardData() {
   }));
 }
 
-// ۲. داده‌های داشبورد مدیر کارخانه
+// ۲. داده‌های داشبورد مدیر کارخانه (مدیر عامل)
 export async function getManagerDashboardData() {
   const user = await getSession();
-  if (!user || user.role !== 'مدیر کارخانه') return null;
+  // در سیستم جدید، چک نمی‌کنیم که نقشش چیست، فقط چک می‌کنیم که لاگین کرده باشد
+  if (!user) return null;
 
   // شمارش درخواست‌های در انتظار تایید
   const pendingLeaves = await prisma.pR_Leave_Requests.count({ where: { Status: "Pending" } });
@@ -123,11 +124,13 @@ export async function getManagerDashboardData() {
 // ۳. داده‌های داشبورد واحد مالی
 export async function getFinanceDashboardData() {
   const user = await getSession();
-  if (!user || user.role !== 'واحد مالی') return null;
+  // در سیستم جدید فقط چک می‌کنیم لاگین کرده باشد
+  if (!user) return null;
 
   // پیدا کردن پرسنلی که حقوق پایه برایشان تنظیم نشده
+  // اصلاح شد: Contractor حذف و CEO قرار داده شد
   const personnelData = await prisma.personnel.findMany({
-    where: { IsActive: true, Role: { not: 'Contractor' } },
+    where: { IsActive: true, Role: { not: 'CEO' } },
     include: {
       PR_Personnel_Finance_PR_Personnel_Finance_Personnel_IDToPersonnel: {
         where: { Is_Active: true },

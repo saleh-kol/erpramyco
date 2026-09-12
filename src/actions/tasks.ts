@@ -14,13 +14,14 @@ export async function getTasks(status: string = 'Pending') {
     },
     orderBy: { Created_At: 'desc' }
   });
-  return JSON.parse(JSON.stringify(tasks));
+  return JSON.parse(JSON.stringify(tasks)); 
 }
 
 // ۲. گرفتن لیست پرسنل برای انتخاب در فرم
 export async function getPersonnelForTask() {
   const personnel = await prisma.personnel.findMany({
-    where: { IsActive: true, Role: { not: 'Contractor' } },
+    // اصلاح شد: Contractor حذف و CEO قرار داده شد
+    where: { IsActive: true, Role: { not: 'CEO' } },
     select: { Personnel_ID: true, Full_Name: true, Personnel_Code: true, Role: true, Personal_Image_Path: true }
   });
   return JSON.parse(JSON.stringify(personnel));
@@ -34,7 +35,6 @@ export async function createTaskAction(formData: FormData): Promise<void> {
   const priority = formData.get('priority') as string;
   const personnelIds = formData.getAll('personnelId').map(id => parseInt(id as string));
 
-  // --- اصلاح شده ---
   const cookieStore = await cookies();
   const session = cookieStore.get('session')?.value;
   let managerId: number | null = null;
@@ -45,10 +45,8 @@ export async function createTaskAction(formData: FormData): Promise<void> {
       managerId = user.userId;
     }
   }
-  // -----------------
 
   try {
-    // ساخت یک رکورد ابلاغیه برای هر کارمند انتخاب شده
     if (personnelIds.length > 0) {
       await prisma.pR_Tasks.createMany({
         data: personnelIds.map(pId => ({

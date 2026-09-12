@@ -58,16 +58,35 @@ export async function createLeaveRequestAction(formData: FormData) {
   if (!dbUser || !dbUser.Personnel_ID)
     return { error: "پروفایل پرسنلی یافت نشد" };
 
-  const leaveTypeId = parseInt(formData.get("leaveTypeId") as string);
+  // گرفتن نام نوع مرخصی از فرمت
+  const leaveTypeName = (formData.get("leaveTypeName") as string).trim();
   const startDate = formData.get("startDate") as string;
   const endDate = formData.get("endDate") as string;
   const reason = formData.get("reason") as string;
 
+  if (!leaveTypeName) return { error: "نوع مرخصی الزامی است" };
+
   try {
+    // ۱. پیدا کردن نوع مرخصی در دیتابیس، اگر نبود آن را می‌سازیم
+    let leaveType = await prisma.pR_Leave_Types.findFirst({
+      where: { Leave_Type_Name: leaveTypeName }
+    });
+
+    if (!leaveType) {
+      leaveType = await prisma.pR_Leave_Types.create({
+        data: {
+          Leave_Type_Code: `L-${Date.now()}`,
+          Leave_Type_Name: leaveTypeName,
+          Is_Paid: true,
+        }
+      });
+    }
+
+    // ۲. ثبت درخواست مرخصی
     await prisma.pR_Leave_Requests.create({
       data: {
         Personnel_ID: dbUser.Personnel_ID,
-        Leave_Type_ID: leaveTypeId,
+        Leave_Type_ID: leaveType.Leave_Type_ID, // استفاده از آیدی پیدا شده یا ساخته شده
         Start_Date: new Date(startDate),
         End_Date: new Date(endDate),
         Reason: reason,
@@ -243,6 +262,20 @@ export async function getMyNotifications() {
     }));
     notifications = [...notifications, ...taskNotifs];
 
+    // پرسنل‌های در انتظار تایید برای مدیرعامل
+    const pendingPersonnel = await prisma.personnel.findMany({
+      where: { IsApproved: false },
+      take: 5
+    });
+    const personnelNotifs = pendingPersonnel.map((p) => ({
+      id: `pers-pending-${p.Personnel_ID}`,
+      text: `پرسنل جدید در انتظار تایید: ${p.Full_Name}`,
+      time: new Date(),
+      type: "pending",
+      link: "/dashboard/personnel",
+    }));
+    notifications = [...notifications, ...personnelNotifs];
+
     // ۵. وضعیت ماموریت‌های کارمند
     const processedMissions = await prisma.pR_Commute_Logs.findMany({
       where: {
@@ -271,6 +304,8 @@ export async function getMyNotifications() {
   const uniqueNotifications = notifications.filter((notif, index, self) =>
     index === self.findIndex((n) => n.id === notif.id)
   );
+
+  
 
   // برگرداندن ۵ نوتیف اخیر - این خط قبلا وجود نداشت!
   return JSON.parse(JSON.stringify(uniqueNotifications.slice(0, 5)));

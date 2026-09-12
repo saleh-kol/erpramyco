@@ -540,6 +540,12 @@ model Personnel {
   Employment_Type                                                   Personnel_Employment_Type? @default(Contractual)
   Personal_Image_Path                                               String?                    @db.VarChar(500)
   IsActive                                                          Boolean?                   @default(true)
+  IsApproved                                                        Boolean?
+  Position_ID          Int?
+  Unit_ID             Int?
+  OrganizationalPosition OrganizationalPosition? @relation(fields: [Position_ID], references: [Position_ID])
+  Unit                 Unit?                 @relation(fields: [Unit_ID], references: [Unit_ID])
+
   PR_Commute_Logs_PR_Commute_Logs_Approved_ByToPersonnel            PR_Commute_Logs[]          @relation("PR_Commute_Logs_Approved_ByToPersonnel")
   PR_Commute_Logs_PR_Commute_Logs_Personnel_IDToPersonnel           PR_Commute_Logs[]          @relation("PR_Commute_Logs_Personnel_IDToPersonnel")
   PR_Daily_Reports_PR_Daily_Reports_Manager_IDToPersonnel           PR_Daily_Reports[]         @relation("PR_Daily_Reports_Manager_IDToPersonnel")
@@ -688,6 +694,7 @@ model Users {
   Created_At   DateTime?  @default(now()) @db.DateTime(0)
   Last_Login   DateTime?  @db.DateTime(0)
   Personnel    Personnel? @relation(fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Users_Personnel")
+  UserPageAccess UserPageAccess[] // <--- این خط را اضافه کنید
 
   @@index([Personnel_ID], map: "Personnel_ID")
 }
@@ -901,6 +908,29 @@ model Work_Orders_Archive {
   @@index([Technician_ID], map: "Technician_ID")
 }
 
+// ۱. جدول جایگاه‌های سازمانی
+model OrganizationalPosition {
+  Position_ID Int         @id @default(autoincrement())
+  Name        String      @unique @db.VarChar(100)
+  Personnel   Personnel[]
+}
+
+// ۲. جدول واحدها (دپارتمان‌ها)
+model Unit {
+  Unit_ID    Int         @id @default(autoincrement())
+  Name       String      @unique @db.VarChar(100)
+  Personnel  Personnel[]
+}
+
+
+model UserPageAccess {
+  Access_ID Int    @id @default(autoincrement())
+  User_ID   Int
+  Route     String @db.VarChar(255)
+  Users     Users  @relation(fields: [User_ID], references: [User_ID], onDelete: Cascade)
+  @@unique([User_ID, Route])
+}
+
 enum PR_Monthly_Salary_Details_Detail_Type {
   Deduction
   Bonus
@@ -941,13 +971,8 @@ enum Machine_Runtime_Log_Log_Type {
 }
 
 enum Personnel_Role {
-  Production_Supervisor @map("Production Supervisor")
-  Factory_Manager       @map("Factory Manager")
-  ModirNet
-  Repairer
-  Operator
-  Commerce
-  Contractor
+  CEO
+  User
 }
 
 enum WO_Action_Log_Action_Type {

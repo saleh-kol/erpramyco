@@ -11,8 +11,8 @@ export async function getMyTodayAttendance() {
   const session = cookieStore.get('session')?.value;
   if (!session) return null;
 
-  const user = await verifySession(session); // تغییر کرد
-  if (!user) return []; // اضافه شد
+  const user = await verifySession(session); 
+  if (!user) return []; 
   
   // پیدا کردن Personnel_ID از روی User_ID
   const dbUser = await prisma.users.findUnique({ where: { User_ID: user.userId } });
@@ -84,7 +84,8 @@ export async function checkOutAction(formData: FormData): Promise<void> {
 // ۴. گرفتن لیست پرسنل برای مدیر
 export async function getPersonnelForAttendance() {
   const personnel = await prisma.personnel.findMany({
-    where: { IsActive: true, Role: { not: 'Contractor' } },
+    // اصلاح شد: Contractor حذف و CEO قرار داده شد
+    where: { IsActive: true, Role: { not: 'CEO' } },
     select: { Personnel_ID: true, Full_Name: true, Personnel_Code: true, Role: true, Personal_Image_Path: true }
   });
   return JSON.parse(JSON.stringify(personnel));

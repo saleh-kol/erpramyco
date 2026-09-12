@@ -3,7 +3,8 @@ import { verifySession } from '@/lib/session'
 import { getEmployeeDashboardData, getManagerDashboardData, getFinanceDashboardData } from '@/actions/dashboardData'
 import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard'
 import ManagerDashboard from '@/components/dashboard/ManagerDashboard'
-import FinanceDashboard from '@/components/dashboard/FinanceDashboard'
+
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const cookieStore = await cookies()
@@ -14,21 +15,14 @@ export default async function DashboardPage() {
   const user = await verifySession(sessionCookie.value)
   if (!user) return null
 
-  // داشبورد مدیر کارخانه
-  if (user.role === 'مدیر کارخانه') {
+  // داشبورد مدیرعامل (CEO)
+  if (user.role === 'CEO') {
     const data = await getManagerDashboardData();
     if (!data) return null;
     return <ManagerDashboard data={data} user={user} />
   }
 
-  // داشبورد واحد مالی
-  if (user.role === 'واحد مالی') {
-    const data = await getFinanceDashboardData();
-    if (!data) return null;
-    return <FinanceDashboard data={data} user={user} />
-  }
-
-  // داشبورد سایر کارمندان
+  // داشبورد سایر کارمندان (User)
   const data = await getEmployeeDashboardData();
   if (!data) return null;
 

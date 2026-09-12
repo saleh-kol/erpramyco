@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 // ۱. گرفتن لیست پرسنل همراه با اطلاعات مالی
 export async function getPersonnelForPayroll() {
   const personnelData = await prisma.personnel.findMany({
-    where: { IsActive: true, Role: { not: 'Contractor' } },
+    // اصلاح شد: Contractor حذف و CEO قرار داده شد
+    where: { IsActive: true, Role: { not: 'CEO' } },
     include: {
       PR_Personnel_Finance_PR_Personnel_Finance_Personnel_IDToPersonnel: {
         where: { Is_Active: true },

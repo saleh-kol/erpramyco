@@ -3,8 +3,8 @@ import { redirect } from 'next/navigation'
 import Sidebar from './Sidebar'
 import Header from '@/components/dashboard/Header'
 import { verifySession } from '@/lib/session'
+import { prisma } from '@/lib/prisma'
 
-// این خط به Next.js می‌گوید: در زمان بیلد (npm run build) این صفحه و تمام صفحات زیرمجموعه آن را استاتیک نسل و دیتابیس را کوئری نزن.
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -16,11 +16,44 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const user = await verifySession(sessionCookie.value)
   if (!user) redirect('/')
 
+  // دریافت اطلاعات پرسنل و دسترسی‌ها از دیتابیس
+  const dbUser = await prisma.users.findUnique({
+    where: { User_ID: user.userId },
+    include: {
+      Personnel: {
+        include: {
+          OrganizationalPosition: true
+        }
+      },
+      UserPageAccess: true
+    }
+  });
+
+  if (!dbUser || !dbUser.Personnel) redirect('/');
+
+  // اصلاح نمایش نقش مدیرعامل
+  let userPosition = 'کاربر';
+  if (dbUser.Personnel.Role === 'CEO') {
+    userPosition = 'مدیرعامل';
+  } else if (dbUser.Personnel.OrganizationalPosition?.Name) {
+    userPosition = dbUser.Personnel.OrganizationalPosition.Name;
+  }
+
+  const allowedRoutes = dbUser.UserPageAccess.map(access => access.Route);
+  const isCEO = dbUser.Personnel.Role === 'CEO';
+  
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f1f5f9' }}>
-      <Sidebar userRole={user.role} />
+      <Sidebar 
+        userPosition={userPosition} 
+        allowedRoutes={allowedRoutes} 
+        isCEO={isCEO} 
+      />
       <div className="dashboard-content">
-        <Header userName={user.name} userImage={user.image} />
+        <Header 
+          userName={dbUser.Personnel.Full_Name} 
+          userImage={dbUser.Personnel.Personal_Image_Path} 
+        />
         <main style={{ padding: '24px' }}>
           {children}
         </main>

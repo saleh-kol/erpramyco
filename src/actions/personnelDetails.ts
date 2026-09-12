@@ -37,13 +37,15 @@ export async function getPersonnelDetails(
   const personnel = await prisma.personnel.findUnique({
     where: { Personnel_ID: personnelId },
     include: {
+      OrganizationalPosition: true, // <--- این خط اضافه شد
+      Unit: true,                   // <--- این خط اضافه شد
       PR_Daily_Reports_PR_Daily_Reports_Personnel_IDToPersonnel: {
         where: { Report_Date: { gte: start, lte: end } },
         orderBy: { Report_Date: "desc" },
         include: {
           PR_Work_Types: true,
           PR_Projects: true,
-          PR_Work_Locations: true, // اضافه شد تا در مودال نمایش داده شود
+          PR_Work_Locations: true,
         },
       },
       PR_Commute_Logs_PR_Commute_Logs_Personnel_IDToPersonnel: {

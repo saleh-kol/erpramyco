@@ -13,7 +13,7 @@
   --color-primary-800: #1e40af;
   --color-primary-900: #1e3a8a;
 
-  --color-bg: #f8fafc;
+  --color-bg: #f0f4f8;
   --color-text: #1e293b;
 }
 
@@ -170,4 +170,54 @@ body {
     max-width: 100% !important;
     margin: 0 !important;
   }
+}
+
+@keyframes heroLogo {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes heroContent {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroButton {
+  0% {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-logo {
+  animation: heroLogo 1s ease-out forwards;
+}
+
+.animate-hero-content {
+  opacity: 0;
+  animation: heroContent 0.8s ease-out 0.35s forwards;
+}
+
+.animate-hero-button {
+  opacity: 0;
+  animation: heroButton 0.8s ease-out 0.7s forwards;
 }
