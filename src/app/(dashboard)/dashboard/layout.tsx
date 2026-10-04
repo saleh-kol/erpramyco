@@ -39,7 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     userPosition = dbUser.Personnel.OrganizationalPosition.Name;
   }
 
-  const allowedRoutes = dbUser.UserPageAccess.map(access => access.Route);
+  const allowedRoutes = dbUser.UserPageAccess.map((access: any) => access.Route);
   const isCEO = dbUser.Personnel.Role === 'CEO';
   
   return (

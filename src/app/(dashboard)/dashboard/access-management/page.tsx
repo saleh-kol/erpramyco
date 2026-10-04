@@ -26,7 +26,8 @@ export default async function AccessManagementPage() {
     "/dashboard/activity-settings",
     "/dashboard/hours-settings",
     "/dashboard/roles",
-    "/dashboard/access-management"
+    "/dashboard/access-management",
+    "/dashboard/announcements"
   ];
 
   return <AccessClient users={users} allRoutes={allRoutes} />;

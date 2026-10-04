@@ -18,7 +18,7 @@ export async function getPersonnelForPayroll() {
     orderBy: { Full_Name: "asc" }
   });
 
-  const mappedPersonnel = personnelData.map(p => ({
+  const mappedPersonnel = personnelData.map((p: any) => ({
     ...p,
     PR_Personnel_Finance: p.PR_Personnel_Finance_PR_Personnel_Finance_Personnel_IDToPersonnel
   }));

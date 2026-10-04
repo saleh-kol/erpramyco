@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Calendar, Briefcase, AlertCircle, FileText, Lock, CheckCircle } from "lucide-react";
+import { Clock, Calendar, Briefcase, AlertCircle, FileText, Lock, CheckCircle, TrendingUp } from "lucide-react";
 
 export default function MyWorkHoursClient({ data }: { data: any }) {
   const router = useRouter();
@@ -12,7 +12,6 @@ export default function MyWorkHoursClient({ data }: { data: any }) {
     1: "هفته اول", 2: "هفته دوم", 3: "هفته سوم", 4: "هفته چهارم", 5: "روزهای پایانی ماه"
   };
 
-  // بررسی اینکه آیا امروز بین ۱ تا ۳ ماه است یا خیر
   const today = new Date();
   const isReportAvailable = today.getDate() >= 1 && today.getDate() <= 3;
 
@@ -35,15 +34,21 @@ export default function MyWorkHoursClient({ data }: { data: any }) {
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "bold", color: "#0f172a" }}>{title}</h3>
-        {isCurrent && <span style={{ fontSize: "10px", backgroundColor: "#fff7ed", color: "#c2410c", padding: "4px", borderRadius: "20px", fontWeight: 600 }}>هفته جاری</span>}
+        {isCurrent && <span style={{ fontSize: "10px", backgroundColor: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: "20px", fontWeight: 600 }}>هفته جاری</span>}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        <div style={{ backgroundColor: "#f8fafc", padding: "10px", borderRadius: "10px" }}>
-          <Clock style={{ width: "20px", height: "20px", color: "#ed6e2b" }} />
+      
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+        <div style={{ backgroundColor: "#fff7ed", padding: "10px", borderRadius: "10px" }}>
+          <TrendingUp style={{ width: "20px", height: "20px", color: "#ed6e2b" }} />
         </div>
         <div>
-          <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>{weekData.hours} <span style={{ fontSize: "12px", color: "#64748b" }}>ساعت</span></p>
-          <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>{weekData.days} روز کاری</p>
+          {/* نمایش ساعت موثر (که شامل ضریب مدیر است) */}
+          <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#ed6e2b" }}>
+            {weekData.effectiveHoursStr || weekData.hours} <span style={{ fontSize: "12px", color: "#64748b" }}>ساعت موثر</span>
+          </p>
+          <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>
+            زمان واقعی: {weekData.actualHoursStr || weekData.hours} ساعت | {weekData.days} روز
+          </p>
         </div>
       </div>
     </div>
@@ -57,7 +62,7 @@ export default function MyWorkHoursClient({ data }: { data: any }) {
         <AlertCircle style={{ width: "24px", height: "24px", color: "#ed6e2b" }} />
         <div>
           <h2 style={{ margin: 0, fontSize: "16px", fontWeight: "bold", color: "#0f172a" }}>شما در حال حاضر در {weekLabels[data.currentWeek]} ماه قرار دارید</h2>
-          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#c2410c" }}>برای مشاهده ریز گزارشات هر بخش، روی کادر آن کلیک کنید.</p>
+          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#c2410c" }}>ساعت موثر بر اساس ضریب تایید مدیر محاسبه شده است. برای مشاهده ریز فعالیت‌ها کلیک کنید.</p>
         </div>
       </div>
 
@@ -127,13 +132,13 @@ export default function MyWorkHoursClient({ data }: { data: any }) {
             <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "bold", color: "#0f172a" }}>جمعه کاری</h3>
             <Calendar style={{ width: "18px", height: "18px", color: "#ef4444" }} />
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
             <div style={{ backgroundColor: "#fef2f2", padding: "10px", borderRadius: "10px" }}>
-              <Clock style={{ width: "20px", height: "20px", color: "#ef4444" }} />
+              <TrendingUp style={{ width: "20px", height: "20px", color: "#ef4444" }} />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>{data.friday.hours} <span style={{ fontSize: "12px", color: "#64748b" }}>ساعت</span></p>
-              <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>{data.friday.days} روز</p>
+              <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#ef4444" }}>{data.friday.effectiveHoursStr || data.friday.hours} <span style={{ fontSize: "12px", color: "#64748b" }}>ساعت موثر</span></p>
+              <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>زمان واقعی: {data.friday.actualHoursStr || data.friday.hours} ساعت | {data.friday.days} روز</p>
             </div>
           </div>
         </div>
@@ -148,13 +153,13 @@ export default function MyWorkHoursClient({ data }: { data: any }) {
             <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "bold", color: "#0f172a" }}>تعطیل کاری</h3>
             <Briefcase style={{ width: "18px", height: "18px", color: "#3b82f6" }} />
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
             <div style={{ backgroundColor: "#eff6ff", padding: "10px", borderRadius: "10px" }}>
-              <Clock style={{ width: "20px", height: "20px", color: "#3b82f6" }} />
+              <TrendingUp style={{ width: "20px", height: "20px", color: "#3b82f6" }} />
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#0f172a" }}>{data.holiday.hours} <span style={{ fontSize: "12px", color: "#64748b" }}>ساعت</span></p>
-              <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>{data.holiday.days} روز</p>
+              <p style={{ margin: 0, fontSize: "20px", fontWeight: "bold", color: "#3b82f6" }}>{data.holiday.effectiveHoursStr || data.holiday.hours} <span style={{ fontSize: "12px", color: "#64748b" }}>ساعت موثر</span></p>
+              <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>زمان واقعی: {data.holiday.actualHoursStr || data.holiday.hours} ساعت | {data.holiday.days} روز</p>
             </div>
           </div>
         </div>

@@ -27,7 +27,7 @@ export async function getMyProjects(status: string = 'Active') {
     orderBy: { Assigned_From: 'desc' }
   });
 
-  const projectsWithRole = assignments.map(a => ({
+  const projectsWithRole = assignments.map((a: any) => ({
     ...a.PR_Projects,
     My_Role: a.Role_In_Project,
     Is_Leader: a.PR_Projects.Project_Leader_ID === dbUser.Personnel_ID

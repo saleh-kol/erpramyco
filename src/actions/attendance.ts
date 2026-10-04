@@ -67,20 +67,35 @@ export async function checkInAction(formData: FormData): Promise<void> {
   revalidatePath('/dashboard/attendance');
 }
 
-// ۳. ثبت خروج
+// ۳. ثبت خروج و محاسبه ساعت کارکرد
 export async function checkOutAction(formData: FormData): Promise<void> {
   const reportId = parseInt(formData.get('reportId') as string);
   
+  const report = await prisma.pR_Daily_Reports.findUnique({
+    where: { Report_ID: reportId }
+  });
+
+  if (!report || !report.Check_In) {
+    throw new Error("زمان ورود برای این گزارش ثبت نشده است.");
+  }
+
+  const checkOutTime = new Date();
+  const checkInTime = new Date(report.Check_In); // الان درست کار می‌کند چون تاریخ کامل ذخیره شده است
+
+  const diffMs = checkOutTime.getTime() - checkInTime.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
   await prisma.pR_Daily_Reports.update({
     where: { Report_ID: reportId },
     data: { 
-      Check_Out: new Date(),
+      Check_Out: checkOutTime,
+      Work_Hours: parseFloat(diffHours.toFixed(2)),
+      Report_Status: 'Submitted'
     }
   });
 
   revalidatePath('/dashboard/attendance');
 }
-
 // ۴. گرفتن لیست پرسنل برای مدیر
 export async function getPersonnelForAttendance() {
   const personnel = await prisma.personnel.findMany({

@@ -45,10 +45,11 @@ export async function createProjectAction(formData: FormData): Promise<void> {
   
   const personnelIds = formData.getAll('personnelId').map(id => parseInt(id as string));
   const personnelRoles = formData.getAll('personnelRole').map(role => role as string);
+  const personnelWages = formData.getAll('personnelWage').map(wage => parseFloat(wage as string) || 0);
+  const projectLeaderId = formData.get('projectLeaderId') ? parseInt(formData.get('projectLeaderId') as string) : null;
 
-  // --- اصلاح شده ---
   const cookieStore = await cookies();
-  const session = cookieStore.get('session')?.value;
+  const session = cookieStore.get("session")?.value;
   let managerId: number | null = null;
 
   if (session) {
@@ -57,9 +58,6 @@ export async function createProjectAction(formData: FormData): Promise<void> {
       managerId = user.userId;
     }
   }
-  // -----------------
-
-  const projectLeaderId = formData.get('projectLeaderId') ? parseInt(formData.get('projectLeaderId') as string) : null;
 
   try {
     const newProject = await prisma.pR_Projects.create({
@@ -87,10 +85,54 @@ export async function createProjectAction(formData: FormData): Promise<void> {
           Personnel_ID: pId,
           Assigned_From: new Date(),
           Role_In_Project: personnelRoles[index] || 'عضو پروژه',
+          Personnel_Wage: personnelWages[index] || 0,
           Is_Active: true
         }))
       });
     }
+
+    // ثبت فازهای پروژه
+    const phaseCount = parseInt(formData.get('phaseCount') as string) || 0;
+    if (phaseCount > 0) {
+      for (let i = 0; i < phaseCount; i++) {
+        const pTitle = formData.get(`phaseTitle_${i}`) as string;
+        const pStart = formData.get(`phaseStart_${i}`) as string;
+        const pEnd = formData.get(`phaseEnd_${i}`) as string;
+        const pLeaderId = parseInt(formData.get(`phaseLeaderId_${i}`) as string);
+        const memberCount = parseInt(formData.get(`phaseMemberCount_${i}`) as string) || 0;
+        
+        if (pTitle && pStart && pEnd && pLeaderId && memberCount > 0) {
+          // ۱. ساخت فاز
+          const newPhase = await prisma.pR_Project_Phases.create({
+            data: {
+              Project_ID: newProject.Project_ID,
+              Title: pTitle,
+              Start_Date: new Date(pStart),
+              End_Date: new Date(pEnd),
+              Status: 'Pending'
+            }
+          });
+
+          // ۲. تخصیص اعضا به فاز
+          const phaseAssignmentsData = [];
+          for (let m = 0; m < memberCount; m++) {
+            const mId = parseInt(formData.get(`phaseMember_${i}_${m}`) as string);
+            if (mId) {
+              phaseAssignmentsData.push({
+                Phase_ID: newPhase.Phase_ID,
+                Personnel_ID: mId,
+                Is_Leader: mId === pLeaderId // اگر آیدی عضو با آیدی مسئول برابر بود، او را مدیر فاز می‌کنیم
+              });
+            }
+          }
+          
+          if (phaseAssignmentsData.length > 0) {
+            await prisma.pR_Phase_Assignments.createMany({ data: phaseAssignmentsData });
+          }
+        }
+      }
+    }
+
   } catch (error: any) {
     console.error("خطا در ثبت پروژه:", error.message);
   }
@@ -98,7 +140,7 @@ export async function createProjectAction(formData: FormData): Promise<void> {
   revalidatePath('/dashboard/projects');
 }
 
-// ۳. حذف کامل پروژه
+// ۴. حذف کامل پروژه
 export async function deleteProjectAction(formData: FormData) {
   const projectId = parseInt(formData.get('projectId') as string);
 

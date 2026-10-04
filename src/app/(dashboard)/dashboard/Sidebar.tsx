@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Users, Settings, Cog, Navigation, Clock, Calendar, 
-  ClipboardCheck, Bell, ChevronDown, UserCircle2, Menu, Briefcase, Wallet, ShieldCheck
+  ClipboardCheck, Bell, ChevronDown, UserCircle2, Menu, Briefcase, Wallet, ShieldCheck, Megaphone
 } from "lucide-react";
 
 // لیست صفحاتی که فقط مدیرعامل باید ببیند
@@ -13,7 +13,7 @@ const CEO_ALLOWED_ROUTES = [
   "/dashboard", "/dashboard/profile", "/dashboard/projects", "/dashboard/missions",
   "/dashboard/tasks", "/dashboard/personnel", "/dashboard/leave-approvals",
   "/dashboard/activity-settings", "/dashboard/hours-settings",
-  "/dashboard/roles", "/dashboard/access-management"
+  "/dashboard/roles", "/dashboard/access-management", "/dashboard/announcements"
 ];
 
 type MenuItem = {
@@ -29,6 +29,7 @@ const menuItems: MenuItem[] = [
   { title: "مدیریت پروژه‌ها", href: "/dashboard/projects", icon: Briefcase },
   { title: "مدیریت ماموریت‌ها", href: "/dashboard/missions", icon: Navigation },
   { title: "صدور ابلاغیه", href: "/dashboard/tasks", icon: Bell },
+  { title: "صدور اطلاعیه", href: "/dashboard/announcements", icon: Megaphone },
   { title: "پرسنل", href: "/dashboard/personnel", icon: Users },
   { title: "درخواست کارکنان", href: "/dashboard/leave-approvals", icon: ClipboardCheck },
   { title: "تنظیمات حقوق و دستمزد", href: "/dashboard/payroll-settings", icon: Wallet },
@@ -137,7 +138,7 @@ export default function Sidebar({ userPosition, allowedRoutes, isCEO }: { userPo
           })}
         </nav>
         <div style={{ padding: "16px", borderTop: "1px solid #1e293b" }}>
-          <p style={{ fontSize: "12px", color: "#64748b", textAlign: "center", margin: 0 }}>ERP Ramyco v2.7.9</p>
+          <p style={{ fontSize: "12px", color: "#64748b", textAlign: "center", margin: 0 }}>ERP Ramyco v2.18.16</p>
         </div>
       </aside>
     </>

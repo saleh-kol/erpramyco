@@ -40,12 +40,11 @@ export async function getEmployeeDashboardData() {
     take: 3,
   });
 
-  // وضعیت فعالیت امروز
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayActivity = await prisma.pR_Daily_Reports.findFirst({
-    where: { Personnel_ID: personnelId, Report_Date: { gte: todayStart } },
-    orderBy: { Report_Date: "desc" },
+  // ماموریت‌های اخیر کاربر
+  const recentMissions = await prisma.pR_Commute_Logs.findMany({
+    where: { Personnel_ID: personnelId, Status: { in: ['Pending', 'InProgress'] } },
+    orderBy: { Commute_Date: "desc" },
+    take: 3,
   });
 
   // مجموع ساعت کارکرد ماه جاری
@@ -55,15 +54,15 @@ export async function getEmployeeDashboardData() {
   });
   
   const currentMonthHours = monthReports
-    .filter(r => getMonth(new Date(r.Report_Date)) === persianMonth && getYear(new Date(r.Report_Date)) === persianYear)
-    .reduce((sum, r) => sum + Number(r.Work_Hours || 0), 0);
+    .filter((r: any) => getMonth(new Date(r.Report_Date)) === persianMonth && getYear(new Date(r.Report_Date)) === persianYear)
+    .reduce((sum: number, r: any) => sum + Number(r.Work_Hours || 0), 0);
 
   const maxMonthlyHours = 192;
 
   return JSON.parse(JSON.stringify({
     pendingTasks,
-    activeProjects: activeProjects.map(a => a.PR_Projects),
-    todayActivity,
+    activeProjects: activeProjects.map((a: any) => a.PR_Projects),
+    recentMissions, 
     currentMonthHours: currentMonthHours.toFixed(1),
     maxMonthlyHours,
     pendingTasksCount: pendingTasks.length,
@@ -74,7 +73,6 @@ export async function getEmployeeDashboardData() {
 // ۲. داده‌های داشبورد مدیر کارخانه (مدیر عامل)
 export async function getManagerDashboardData() {
   const user = await getSession();
-  // در سیستم جدید، چک نمی‌کنیم که نقشش چیست، فقط چک می‌کنیم که لاگین کرده باشد
   if (!user) return null;
 
   // شمارش درخواست‌های در انتظار تایید
@@ -102,15 +100,15 @@ export async function getManagerDashboardData() {
   });
 
   // گرفتن نام پرسنل‌ها
-  const personnelIds = [...new Set(recentReportsRaw.map(r => r.Personnel_ID))];
+  const personnelIds = [...new Set(recentReportsRaw.map((r: any) => r.Personnel_ID))];
   const personnelList = await prisma.personnel.findMany({
     where: { Personnel_ID: { in: personnelIds } },
     select: { Personnel_ID: true, Full_Name: true }
   });
 
-  const recentReports = recentReportsRaw.map(r => ({
+  const recentReports = recentReportsRaw.map((r: any) => ({
     ...r,
-    Personnel: personnelList.find(p => p.Personnel_ID === r.Personnel_ID) || null
+    Personnel: personnelList.find((p: any) => p.Personnel_ID === r.Personnel_ID) || null
   }));
 
   return JSON.parse(JSON.stringify({
@@ -124,11 +122,9 @@ export async function getManagerDashboardData() {
 // ۳. داده‌های داشبورد واحد مالی
 export async function getFinanceDashboardData() {
   const user = await getSession();
-  // در سیستم جدید فقط چک می‌کنیم لاگین کرده باشد
   if (!user) return null;
 
   // پیدا کردن پرسنلی که حقوق پایه برایشان تنظیم نشده
-  // اصلاح شد: Contractor حذف و CEO قرار داده شد
   const personnelData = await prisma.personnel.findMany({
     where: { IsActive: true, Role: { not: 'CEO' } },
     include: {
@@ -139,10 +135,10 @@ export async function getFinanceDashboardData() {
     }
   });
 
-  const missingSalaryList = personnelData.filter(p => {
+  const missingSalaryList = personnelData.filter((p: any) => {
     const fin = p.PR_Personnel_Finance_PR_Personnel_Finance_Personnel_IDToPersonnel[0];
     return !fin || Number(fin.Base_Monthly_Salary) === 0 || Number(fin.Base_Hourly_Rate) === 0;
-  }).map(p => ({ Personnel_ID: p.Personnel_ID, Full_Name: p.Full_Name, Personnel_Code: p.Personnel_Code }));
+  }).map((p: any) => ({ Personnel_ID: p.Personnel_ID, Full_Name: p.Full_Name, Personnel_Code: p.Personnel_Code }));
 
   // مجموع پاداش‌های پروژه‌های تکمیل شده ماه گذشته
   const now = new Date();
@@ -157,7 +153,7 @@ export async function getFinanceDashboardData() {
     select: { Final_Bonus: true, Project_Name: true }
   });
   
-  const totalBonuses = completedProjects.reduce((sum, p) => sum + Number(p.Final_Bonus || 0), 0);
+  const totalBonuses = completedProjects.reduce((sum: number, p: any) => sum + Number(p.Final_Bonus || 0), 0);
 
   return JSON.parse(JSON.stringify({
     missingSalaryList,

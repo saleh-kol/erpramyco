@@ -44,7 +44,21 @@ export async function getMyLeaveRequests(startDate?: string, endDate?: string) {
     include: { PR_Leave_Types: true },
     orderBy: { Requested_At: "desc" },
   });
-  return JSON.parse(JSON.stringify(requests));
+
+  // اصلاح محاسبه تعداد روزهای مرخصی
+  const mappedRequests = requests.map((r: any) => {
+    const sDate = new Date(r.Start_Date);
+    const eDate = new Date(r.End_Date);
+    const diffTime = Math.abs(eDate.getTime() - sDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 برای شامل شدن روز آخر
+    
+    return {
+      ...r,
+      Days_Count: diffDays
+    };
+  });
+
+  return JSON.parse(JSON.stringify(mappedRequests));
 }
 
 // ۳. ثبت درخواست مرخصی جدید
@@ -58,7 +72,6 @@ export async function createLeaveRequestAction(formData: FormData) {
   if (!dbUser || !dbUser.Personnel_ID)
     return { error: "پروفایل پرسنلی یافت نشد" };
 
-  // گرفتن نام نوع مرخصی از فرمت
   const leaveTypeName = (formData.get("leaveTypeName") as string).trim();
   const startDate = formData.get("startDate") as string;
   const endDate = formData.get("endDate") as string;
@@ -67,7 +80,6 @@ export async function createLeaveRequestAction(formData: FormData) {
   if (!leaveTypeName) return { error: "نوع مرخصی الزامی است" };
 
   try {
-    // ۱. پیدا کردن نوع مرخصی در دیتابیس، اگر نبود آن را می‌سازیم
     let leaveType = await prisma.pR_Leave_Types.findFirst({
       where: { Leave_Type_Name: leaveTypeName }
     });
@@ -82,11 +94,10 @@ export async function createLeaveRequestAction(formData: FormData) {
       });
     }
 
-    // ۲. ثبت درخواست مرخصی
     await prisma.pR_Leave_Requests.create({
       data: {
         Personnel_ID: dbUser.Personnel_ID,
-        Leave_Type_ID: leaveType.Leave_Type_ID, // استفاده از آیدی پیدا شده یا ساخته شده
+        Leave_Type_ID: leaveType.Leave_Type_ID,
         Start_Date: new Date(startDate),
         End_Date: new Date(endDate),
         Reason: reason,
@@ -101,7 +112,7 @@ export async function createLeaveRequestAction(formData: FormData) {
   }
 }
 
-// ۴. گرفتن همه درخواست‌ها برای مدیر کارخانه
+// ۴. گرفتن همه درخواست‌ها برای مدیر
 export async function getAllLeaveRequests(status: string = 'Pending') {
   let whereClause: any = {};
   
@@ -118,7 +129,19 @@ export async function getAllLeaveRequests(status: string = 'Pending') {
     orderBy: { Requested_At: "desc" },
   });
 
-  return JSON.parse(JSON.stringify(requests));
+  const mappedRequests = requests.map((r: any) => {
+    const sDate = new Date(r.Start_Date);
+    const eDate = new Date(r.End_Date);
+    const diffTime = Math.abs(eDate.getTime() - sDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    
+    return {
+      ...r,
+      Days_Count: diffDays
+    };
+  });
+
+  return JSON.parse(JSON.stringify(mappedRequests));
 }
 
 // ۵. تایید یا رد درخواست توسط مدیر
@@ -159,15 +182,15 @@ export async function getMyNotifications() {
 
   let notifications: any[] = [];
 
-  // ۱. نوتیف‌های مربوط به مرخصی و پروژه برای مدیر
-  if (user.role === "مدیر کارخانه") {
+  // ۱. نوتیف‌های مربوط به مرخصی، پروژه، ماموریت، پرسنل و ابلاغیه برای مدیرعامل (CEO)
+  if (user.role === "CEO") {
     const pending = await prisma.pR_Leave_Requests.findMany({
       where: { Status: "Pending" },
       include: { Personnel_PR_Leave_Requests_Personnel_IDToPersonnel: true },
       orderBy: { Requested_At: "desc" },
       take: 5,
     });
-    notifications = pending.map((p) => ({
+    notifications = pending.map((p: any) => ({
       id: `leave-${p.Leave_ID}`,
       text: `درخواست مرخصی از ${p.Personnel_PR_Leave_Requests_Personnel_IDToPersonnel?.Full_Name}`,
       time: p.Requested_At,
@@ -175,13 +198,12 @@ export async function getMyNotifications() {
       link: "/dashboard/leave-approvals",
     }));
 
-    // درخواست‌های اتمام پروژه برای مدیر
     const pendingProjects = await prisma.pR_Projects.findMany({
       where: { Status: "OnHold" },
       orderBy: { Updated_At: "desc" },
       take: 5,
     });
-    const projectNotifs = pendingProjects.map((p) => ({
+    const projectNotifs = pendingProjects.map((p: any) => ({
       id: `proj-pending-${p.Project_ID}`,
       text: `درخواست اتمام پروژه: ${p.Project_Name}`,
       time: p.Updated_At,
@@ -190,14 +212,13 @@ export async function getMyNotifications() {
     }));
     notifications = [...notifications, ...projectNotifs];
 
-    // درخواست‌های ماموریت برای مدیر
     const pendingMissions = await prisma.pR_Commute_Logs.findMany({
       where: { Status: "Pending" },
       include: { Personnel_PR_Commute_Logs_Personnel_IDToPersonnel: true },
       orderBy: { Commute_Date: "desc" },
       take: 5,
     });
-    const missionNotifs = pendingMissions.map((m) => ({
+    const missionNotifs = pendingMissions.map((m: any) => ({
       id: `mission-pending-${m.Commute_ID}`,
       text: `درخواست ماموریت از ${m.Personnel_PR_Commute_Logs_Personnel_IDToPersonnel?.Full_Name}`,
       time: m.Commute_Date,
@@ -205,6 +226,37 @@ export async function getMyNotifications() {
       link: "/dashboard/leave-approvals",
     }));
     notifications = [...notifications, ...missionNotifs];
+
+    // پرسنل‌های در انتظار تایید برای مدیرعامل
+    const pendingPersonnel = await prisma.personnel.findMany({
+      where: { IsApproved: false },
+      take: 5
+    });
+    const personnelNotifs = pendingPersonnel.map((p: any) => ({
+      id: `pers-pending-${p.Personnel_ID}`,
+      text: `پرسنل جدید در انتظار تایید: ${p.Full_Name}`,
+      time: new Date(),
+      type: "pending",
+      link: "/dashboard/personnel",
+    }));
+    notifications = [...notifications, ...personnelNotifs];
+
+    // ابلاغیه‌های در انتظار تایید برای مدیرعامل (Status: Submitted)
+    const submittedTasks = await prisma.pR_Tasks.findMany({
+      where: { Status: "Submitted" },
+      include: { Personnel_AssignedTo: true },
+      orderBy: { Updated_At: "desc" },
+      take: 5,
+    });
+    const taskNotifs = submittedTasks.map((t: any) => ({
+      id: `task-submitted-${t.Task_ID}`,
+      text: `ابلاغیه انجام شده توسط ${t.Personnel_AssignedTo?.Full_Name || "کارمند"} در انتظار تایید است`,
+      time: t.Updated_At,
+      type: "pending",
+      link: "/dashboard/tasks",
+    }));
+    notifications = [...notifications, ...taskNotifs];
+
   } else {
     // ۲. نوتیف‌های مرخصی برای کارمند
     const processed = await prisma.pR_Leave_Requests.findMany({
@@ -216,7 +268,7 @@ export async function getMyNotifications() {
       orderBy: { Approved_At: "desc" },
       take: 5,
     });
-    notifications = processed.map((p) => ({
+    notifications = processed.map((p: any) => ({
       id: `leave-${p.Leave_ID}`,
       text: `درخواست مرخصی شما ${p.Status === "Approved" ? "تایید" : "رد"} شد`,
       time: p.Approved_At,
@@ -231,10 +283,10 @@ export async function getMyNotifications() {
     });
 
     const recentProjects = myProjectAssignments
-      .map((a) => a.PR_Projects)
-      .filter((p) => p.Status === "Completed" || p.Status === "Cancelled");
+      .map((a: any) => a.PR_Projects)
+      .filter((p: any) => p.Status === "Completed" || p.Status === "Cancelled");
 
-    const projNotifs = recentProjects.map((p) => ({
+    const projNotifs = recentProjects.map((p: any) => ({
       id: `proj-status-${p.Project_ID}`,
       text:
         p.Status === "Completed"
@@ -246,35 +298,24 @@ export async function getMyNotifications() {
     }));
     notifications = [...notifications, ...projNotifs];
 
-    // ۴. ابلاغیه‌های جدید برای کارمند
-    const pendingTasks = await prisma.pR_Tasks.findMany({
-      where: { Assigned_To: dbUser.Personnel_ID, Status: "Pending" },
-      orderBy: { Created_At: "desc" },
+    // ۴. وضعیت ابلاغیه‌های کارمند (تایید شده توسط مدیرعامل)
+    const taskUpdates = await prisma.pR_Tasks.findMany({
+      where: { 
+        Assigned_To: dbUser.Personnel_ID, 
+        Status: "Approved" 
+      },
+      orderBy: { Updated_At: "desc" },
       take: 5,
     });
 
-    const taskNotifs = pendingTasks.map((t) => ({
-      id: `task-${t.Task_ID}`,
-      text: `ابلاغیه جدید: ${t.Title}`,
-      time: t.Created_At,
-      type: "task",
+    const taskNotifs = taskUpdates.map((t: any) => ({
+      id: `task-approved-${t.Task_ID}`,
+      text: `ابلاغیه "${t.Title}" توسط مدیرعامل تایید شد`,
+      time: t.Updated_At,
+      type: "approved",
       link: "/dashboard/my-tasks",
     }));
     notifications = [...notifications, ...taskNotifs];
-
-    // پرسنل‌های در انتظار تایید برای مدیرعامل
-    const pendingPersonnel = await prisma.personnel.findMany({
-      where: { IsApproved: false },
-      take: 5
-    });
-    const personnelNotifs = pendingPersonnel.map((p) => ({
-      id: `pers-pending-${p.Personnel_ID}`,
-      text: `پرسنل جدید در انتظار تایید: ${p.Full_Name}`,
-      time: new Date(),
-      type: "pending",
-      link: "/dashboard/personnel",
-    }));
-    notifications = [...notifications, ...personnelNotifs];
 
     // ۵. وضعیت ماموریت‌های کارمند
     const processedMissions = await prisma.pR_Commute_Logs.findMany({
@@ -285,7 +326,7 @@ export async function getMyNotifications() {
       orderBy: { Approved_At: "desc" },
       take: 5,
     });
-    const procMissionNotifs = processedMissions.map((m) => ({
+    const procMissionNotifs = processedMissions.map((m: any) => ({
       id: `mission-status-${m.Commute_ID}`,
       text: `درخواست ماموریت شما ${m.Status === "InProgress" ? "تایید شد و در حال انجام است" : "رد شد"}`,
       time: m.Approved_At,
@@ -301,12 +342,10 @@ export async function getMyNotifications() {
   );
 
   // حذف نوتیف‌های تکراری بر اساس id
-  const uniqueNotifications = notifications.filter((notif, index, self) =>
-    index === self.findIndex((n) => n.id === notif.id)
+  const uniqueNotifications = notifications.filter((notif: any, index: number, self: any[]) =>
+    index === self.findIndex((n: any) => n.id === notif.id)
   );
 
-  
-
-  // برگرداندن ۵ نوتیف اخیر - این خط قبلا وجود نداشت!
+  // برگرداندن ۵ نوتیف اخیر
   return JSON.parse(JSON.stringify(uniqueNotifications.slice(0, 5)));
 }

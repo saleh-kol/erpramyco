@@ -33,6 +33,7 @@ const routeTranslations: Record<string, string> = {
   "/dashboard/hours-settings": "تنظیمات ساعات کاری",
   "/dashboard/roles": "تعریف نقش‌ها",
   "/dashboard/access-management": "مدیریت دسترسی پرسنل",
+  "/dashboard/announcements": "صدور اطلاعیه",
 };
 
 export default function AccessClient({

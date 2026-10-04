@@ -2,59 +2,60 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
-// ۱. گرفتن اطلاعات کامل پروژه
+// ۱. گرفتن اطلاعات کامل پروژه (اصلاح شد: اضافه شدن Leader و Phases)
 export async function getProjectDetails(id: string) {
   const project = await prisma.pR_Projects.findUnique({
     where: { Project_ID: parseInt(id) },
     include: {
+      Project_Leader: true, // اضافه شد
       PR_Project_Assignments: {
         include: {
           Personnel: true
         }
+      },
+      PR_Project_Phases: { // اضافه شد
+        include: {
+          PR_Phase_Assignments: {
+            include: { Personnel: true }
+          }
+        },
+        orderBy: { Start_Date: 'asc' }
       }
     }
   });
   return JSON.parse(JSON.stringify(project));
 }
 
-// ۲. آپدیت اطلاعات پروژه و امتیاز مدیرعامل
-export async function updateProjectAction(formData: FormData): Promise<void> {
-  const projectId = parseInt(formData.get('projectId') as string);
-  const projectCode = formData.get('projectCode') as string;
-  const projectName = formData.get('projectName') as string;
-  const description = formData.get('description') as string;
-  const startDate = formData.get('startDate') as string;
-  const endDate = formData.get('endDate') as string;
-  const budget = parseFloat(formData.get('budget') as string);
-  const status = formData.get('status') as 'Active' | 'Completed' | 'Cancelled' | 'OnHold';
-  const managerScore = formData.get('managerScore') as string;
-  const managerComment = formData.get('managerComment') as string;
+// ۲. اکشن ویرایش اطلاعات پروژه و ارزیابی مدیر
+export async function updateProjectAction(formData: FormData) {
+  const projectId = parseInt(formData.get("projectId") as string);
+  
+  const managerScore = formData.get("managerScore") as string;
+  const status = formData.get("status") as string;
+  const managerComment = formData.get("managerComment") as string;
 
   try {
     await prisma.pR_Projects.update({
       where: { Project_ID: projectId },
       data: {
-        Project_Code: projectCode,
-        Project_Name: projectName,
-        Description: description,
-        Start_Date: startDate ? new Date(startDate) : null,
-        End_Date: endDate ? new Date(endDate) : null,
-        Budget: budget || 0,
-        Status: status,
         Manager_Score: managerScore ? parseFloat(managerScore) : null,
+        Status: status,
         Manager_Comment: managerComment || null,
       }
     });
   } catch (error: any) {
-    console.error("خطا در ویرایش پروژه:", error.message);
+    console.error("خطا در بروزرسانی پروژه:", error.message);
+    return { error: `خطا در بروزرسانی: ${error.message}` };
   }
 
   revalidatePath(`/dashboard/projects/${projectId}`);
+  revalidatePath("/dashboard/projects");
+  
+  return { success: true };
 }
 
-// ۳. حذف کامل پروژه
+// ۳. حذف کامل پروژه (اصلاح شد: اضافه شدن حذف فازها)
 export async function deleteProjectAction(formData: FormData) {
   const projectId = parseInt(formData.get('projectId') as string);
 
@@ -63,14 +64,32 @@ export async function deleteProjectAction(formData: FormData) {
     await prisma.pR_Project_Assignments.deleteMany({
       where: { Project_ID: projectId }
     });
-    
+
     // ۲. قطع ارتباط گزارش‌های روزانه با این پروژه (تا تاریخچه کارکرد پاک نشود)
     await prisma.pR_Daily_Reports.updateMany({
       where: { Project_ID: projectId },
       data: { Project_ID: null }
     });
 
-    // ۳. سپس خود پروژه حذف می‌شود
+    // ۳. حذف تخصیص اعضای فازها
+    const phases = await prisma.pR_Project_Phases.findMany({
+      where: { Project_ID: projectId },
+      select: { Phase_ID: true }
+    });
+    const phaseIds = phases.map(p => p.Phase_ID);
+
+    if (phaseIds.length > 0) {
+      await prisma.pR_Phase_Assignments.deleteMany({
+        where: { Phase_ID: { in: phaseIds } }
+      });
+    }
+
+    // ۴. حذف خود فازها
+    await prisma.pR_Project_Phases.deleteMany({
+      where: { Project_ID: projectId }
+    });
+
+    // ۵. سپس خود پروژه حذف می‌شود
     await prisma.pR_Projects.delete({
       where: { Project_ID: projectId }
     });

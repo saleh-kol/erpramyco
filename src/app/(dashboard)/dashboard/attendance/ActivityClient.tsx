@@ -48,6 +48,24 @@ export default function ActivityClient({
     setFormError(null);
 
     const formData = new FormData(e.currentTarget);
+    
+    // --- اعتبارسنجی ساعت شروع و پایان ---
+    const checkIn = formData.get("checkIn") as string;
+    const checkOut = formData.get("checkOut") as string;
+
+    if (checkIn && checkOut) {
+      const [inH, inM] = checkIn.split(':').map(Number);
+      const [outH, outM] = checkOut.split(':').map(Number);
+      
+      const inTotalMinutes = inH * 60 + inM;
+      const outTotalMinutes = outH * 60 + outM;
+
+      if (outTotalMinutes <= inTotalMinutes) {
+        setFormError("ساعت پایان باید حتماً بعد از ساعت شروع باشد!");
+        return;
+      }
+    }
+    // ------------------------------------
 
     formData.append("category", category);
 

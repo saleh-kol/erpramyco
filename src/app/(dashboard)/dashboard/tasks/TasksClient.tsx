@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createTaskAction } from "@/actions/tasks";
+import { createTaskAction, reviewTaskAction } from "@/actions/tasks";
 import {
-  Search, Plus, Bell, X, Save, CheckCircle, UserCircle2, Users, Check
+  Search, Plus, Bell, X, Save, CheckCircle, UserCircle2, Users, Check, FileText
 } from "lucide-react";
 
 import DatePicker from "react-multi-date-picker";
@@ -12,7 +12,6 @@ import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 
 const toPersianDate = (date: Date | string) => { if (!date) return "-"; const d = new Date(date); if (isNaN(d.getTime())) return "-"; return d.toLocaleDateString("fa-IR"); };
-const translateRole = (role: string) => { const roles: any = { "Factory Manager": "مدیر کارخانه", "ModirNet": "مدیر نت", "Production Supervisor": "سرپرست تولید", "Repairer": "تعمیرکار", "Operator": "اپراتور", "Commerce": "بازرگانی", "Contractor": "پیمانکار" }; return roles[role] || role; };
 const translatePriority = (p: string) => { const s: any = { "Low": "کم", "Normal": "معمولی", "High": "زیاد", "Urgent": "فوری" }; return s[p] || p; };
 
 const formatToLocalISO = (dateObj: any) => {
@@ -24,7 +23,8 @@ const formatToLocalISO = (dateObj: any) => {
   } catch (e) { return ""; }
 };
 
-export default function TasksClient({ tasks, personnel, currentStatus }: { tasks: any[], personnel: any[], currentStatus: string }) {
+// اضافه شدن isCEO به پراپ‌ها
+export default function TasksClient({ tasks, personnel, currentStatus, isCEO }: { tasks: any[], personnel: any[], currentStatus: string, isCEO: boolean }) {
   const router = useRouter();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,6 +37,10 @@ export default function TasksClient({ tasks, personnel, currentStatus }: { tasks
 
   const [isMounted, setIsMounted] = useState(false);
   const [dueDateVal, setDueDateVal] = useState<any>(null);
+
+  // استیت‌های مربوط به مودال تایید مدیرعامل
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -77,6 +81,25 @@ export default function TasksClient({ tasks, personnel, currentStatus }: { tasks
     setTimeout(() => setToast(null), 3000);
   };
 
+  const openTaskModal = (task: any) => {
+    if (currentStatus === "Submitted" && isCEO) {
+      setSelectedTask(task);
+    }
+  };
+
+  const handleReview = (action: string) => {
+    if (!selectedTask) return;
+    const formData = new FormData();
+    formData.append("taskId", String(selectedTask.Task_ID));
+    formData.append("action", action);
+    
+    startTransition(async () => {
+      const res = await reviewTaskAction(formData);
+      if (res?.error) alert(res.error);
+      else setSelectedTask(null);
+    });
+  };
+
   return (
     <div style={{ backgroundColor: "#f1f5f9", minHeight: "100vh", padding: "24px" }}>
       <style>{`
@@ -86,7 +109,7 @@ export default function TasksClient({ tasks, personnel, currentStatus }: { tasks
         
         .erp-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn 0.2s ease-out; }
         .erp-modal-container { background: white; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; max-width: 800px; max-height: 90vh; overflow-y: auto; border-top: 4px solid #ed6e2b; animation: scaleIn 0.2s ease-out; }
-        .erp-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: white; z-index: 10; border-radius: 20px 20px 0 0; }
+        .erp-modal-header { display: flex; justify-content: space-between; alignItems: center; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: white; z-index: 10; border-radius: 20px 20px 0 0; }
         .erp-modal-body { padding: 24px; }
         
         .erp-input { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #e2e8f0; outline: none; font-size: 14px; font-family: inherit; background-color: #f8fafc; transition: all 0.2s; box-sizing: border-box; }
@@ -110,8 +133,14 @@ export default function TasksClient({ tasks, personnel, currentStatus }: { tasks
            <input type="text" placeholder="جستجوی ابلاغیه یا نام کارمند..." className="erp-input" style={{ padding: "12px 40px 12px 16px" }} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={() => handleTabChange("Pending")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "Pending" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "Pending" ? "white" : "#64748b" }}>انجام نشده</button>
-            <button onClick={() => handleTabChange("Done")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "Done" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "Done" ? "white" : "#64748b" }}>انجام شده</button>
+            <button onClick={() => handleTabChange("Pending")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "Pending" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "Pending" ? "white" : "#64748b" }}>در حال انجام</button>
+            
+            {/* تب جدید فقط برای مدیرعامل */}
+            {isCEO && (
+              <button onClick={() => handleTabChange("Submitted")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "Submitted" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "Submitted" ? "white" : "#64748b" }}>در انتظار تایید</button>
+            )}
+            
+            <button onClick={() => handleTabChange("Approved")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "Approved" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "Approved" ? "white" : "#64748b" }}>تایید شده</button>
           </div>
         </div>
         <button onClick={() => setIsModalOpen(true)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 24px", background: "linear-gradient(135deg, #ed6e2b 0%, #ea580c 100%)", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: "bold", boxShadow: "0 4px 6px -1px rgba(237, 110, 43, 0.2)" }}>
@@ -133,7 +162,13 @@ export default function TasksClient({ tasks, personnel, currentStatus }: { tasks
           </thead>
           <tbody>
             {filteredTasks.map((t: any) => (
-              <tr key={t.Task_ID} style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <tr 
+                key={t.Task_ID} 
+                onClick={() => openTaskModal(t)} 
+                style={{ borderBottom: "1px solid #f1f5f9", cursor: currentStatus === "Submitted" && isCEO ? "pointer" : "default" }}
+                onMouseEnter={(e) => { if (currentStatus === "Submitted" && isCEO) e.currentTarget.style.backgroundColor = "#fffbf5" }}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+              >
                 <td style={{ padding: "16px", fontSize: "14px", color: "#0f172a", fontWeight: 600 }}>{t.Title}</td>
                 <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>{t.Personnel_AssignedTo?.Full_Name || "-"}</td>
                 <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>{toPersianDate(t.Due_Date)}</td>
@@ -143,8 +178,8 @@ export default function TasksClient({ tasks, personnel, currentStatus }: { tasks
                   </span>
                 </td>
                 <td style={{ padding: "16px", fontSize: "14px" }}>
-                  <span style={{ padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, backgroundColor: t.Status === 'Done' ? '#f0fdf4' : '#fff7ed', color: t.Status === 'Done' ? '#166534' : '#c2410c' }}>
-                    {t.Status === 'Done' ? 'انجام شده' : 'در انتظار انجام'}
+                  <span style={{ padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, backgroundColor: t.Status === 'Approved' ? '#f0fdf4' : t.Status === 'Submitted' ? '#eff6ff' : '#fff7ed', color: t.Status === 'Approved' ? '#166534' : t.Status === 'Submitted' ? '#1d4ed8' : '#c2410c' }}>
+                    {t.Status === 'Approved' ? 'تایید شده' : t.Status === 'Submitted' ? 'در انتظار تایید' : 'در حال انجام'}
                   </span>
                 </td>
               </tr>
@@ -153,6 +188,49 @@ export default function TasksClient({ tasks, personnel, currentStatus }: { tasks
           </tbody>
         </table>
       </div>
+
+      {/* مودال تایید/رد ابلاغیه (فقط برای مدیرعامل) */}
+      {selectedTask && (
+        <div className="erp-modal-overlay" onClick={() => setSelectedTask(null)}>
+          <div className="erp-modal-container" style={{ maxWidth: "500px" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px", borderBottom: "1px solid #f1f5f9" }}>
+              <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "bold", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                <FileText style={{ width: "20px", height: "20px", color: "#ed6e2b" }} /> بررسی ابلاغیه
+              </h2>
+              <button className="erp-btn-close" onClick={() => setSelectedTask(null)}><X style={{ width: "20px", height: "20px" }} /></button>
+            </div>
+
+            <div style={{ padding: "24px" }}>
+              <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "12px", marginBottom: "16px" }}>
+                <p style={{ margin: "0 0 8px 0", fontSize: "12px", color: "#64748b" }}>عنوان ابلاغیه</p>
+                <p style={{ margin: 0, fontSize: "15px", fontWeight: "bold", color: "#0f172a" }}>{selectedTask.Title}</p>
+              </div>
+              
+              <div style={{ backgroundColor: "#fff7ed", padding: "16px", borderRadius: "12px", marginBottom: "24px", border: "1px solid #fed7aa" }}>
+                <p style={{ margin: "0 0 8px 0", fontSize: "12px", color: "#c2410c", fontWeight: "600" }}>توضیحات:</p>
+                <p style={{ margin: 0, fontSize: "14px", color: "#334155", lineHeight: "1.6" }}>{selectedTask.Description || "بدون توضیحات"}</p>
+              </div>
+
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button 
+                  onClick={() => handleReview("reject")} 
+                  disabled={isPending}
+                  style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "1px solid #fecaca", backgroundColor: "#fef2f2", color: "#991b1b", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+                >
+                  <X style={{ width: "18px", height: "18px" }} /> رد و بازگشت به کارمند
+                </button>
+                <button 
+                  onClick={() => handleReview("approve")} 
+                  disabled={isPending}
+                  style={{ flex: 1, padding: "12px", borderRadius: "10px", border: "none", backgroundColor: "#16a34a", color: "white", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+                >
+                  <Check style={{ width: "18px", height: "18px" }} /> تایید نهایی
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* پاپ‌آپ صدور ابلاغیه */}
       {isModalOpen && (
@@ -251,7 +329,10 @@ export default function TasksClient({ tasks, personnel, currentStatus }: { tasks
                         <p style={{ margin: 0, fontSize: "14px", fontWeight: "bold", color: "#0f172a" }}>{p.Full_Name}</p>
                         <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#64748b" }}>{p.Personnel_Code}</p>
                       </div>
-                      <span style={{ fontSize: "11px", backgroundColor: "#f1f5f9", color: "#475569", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>{translateRole(p.Role)}</span>
+                      {/* اصلاح نمایش نقش با جایگاه و واحد */}
+                      <span style={{ fontSize: "11px", backgroundColor: "#f1f5f9", color: "#475569", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>
+                        {p.OrganizationalPosition?.Name || "بدون جایگاه"} - {p.Unit?.Name || "بدون واحد"}
+                      </span>
                     </div>
                   );
                 })}

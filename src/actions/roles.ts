@@ -77,11 +77,45 @@ export async function updateUserAccessAction(userId: number, routes: string[]) {
       await prisma.userPageAccess.createMany({
         data: routes.map(route => ({ User_ID: userId, Route: route }))
       });
+
+      // ثبت لاگ برای هر دسترسی اضافه شده
+      await prisma.accessChangeLog.createMany({
+        data: routes.map(route => ({
+          Target_User_ID: userId,
+          Actor_User_ID: currentUser.userId,
+          Action_Type: "GRANT",
+          Route: route
+        }))
+      });
     }
-    
+
     revalidatePath("/dashboard/access-management");
     return { success: true };
   } catch (error: any) {
     return { error: `خطا در بروزرسانی دسترسی: ${error.message}` };
+  }
+}
+
+// ۶. حذف جایگاه سازمانی
+export async function deletePositionAction(formData: FormData) {
+  const id = parseInt(formData.get("id") as string);
+  try {
+    await prisma.organizationalPosition.delete({ where: { Position_ID: id } });
+    revalidatePath("/dashboard/roles");
+    return { success: true };
+  } catch (error: any) {
+    return { error: "امکان حذف این جایگاه وجود ندارد. (احتمالاً به پرسنل اختصاص داده شده است)" };
+  }
+}
+
+// ۷. حذف واحد سازمانی
+export async function deleteUnitAction(formData: FormData) {
+  const id = parseInt(formData.get("id") as string);
+  try {
+    await prisma.unit.delete({ where: { Unit_ID: id } });
+    revalidatePath("/dashboard/roles");
+    return { success: true };
+  } catch (error: any) {
+    return { error: "امکان حذف این واحد وجود ندارد. (احتمالاً به پرسنل اختصاص داده شده است)" };
   }
 }

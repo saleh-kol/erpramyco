@@ -1,9 +1,9 @@
 'use client'
 
-import { LogOut, Bell } from 'lucide-react'
+import { LogOut, Bell, Megaphone, X, FileText } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { getLatestAnnouncementForUser, markAnnouncementAsRead } from '@/actions/announcements'
 
 const toPersianTimeAgo = (date: Date | string) => {
   if (!date) return "";
@@ -18,6 +18,9 @@ export default function Header({ userName, userImage }: { userName: string, user
   const [showNotif, setShowNotif] = useState(false);
   const [readIds, setReadIds] = useState<string[]>([]);
   const [visibleNotifs, setVisibleNotifs] = useState<any[]>([]);
+  
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [announcement, setAnnouncement] = useState<any>(null);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const isInitialMount = useRef(true);
@@ -59,7 +62,34 @@ export default function Header({ userName, userImage }: { userName: string, user
     return () => clearInterval(interval);
   }, [readIds, visibleNotifs.length]);
 
-  // ۳. هندلر کلیک روی نوتیف
+  // ۳. دریافت آخرین اطلاعیه مدیر
+  useEffect(() => {
+    const fetchAnnouncement = async () => {
+      const latest = await getLatestAnnouncementForUser();
+      if (latest) {
+        // بررسی اینکه آیا این اطلاعیه قبلاً در local storage خوانده شده یا خیر
+        const readAnnouncements = JSON.parse(localStorage.getItem('readAnnouncements') || '[]');
+        if (!readAnnouncements.includes(latest.id)) {
+          latest.isRead = false;
+          // اگر اطلاعیه جدید بود و کاربر برای اولین بار آن را می‌بیند، صدا پخش شود
+          if (audioRef.current) {
+            audioRef.current.play().catch(e => console.log("مرورگر اجازه پخش صدا را نداد"));
+          }
+        } else {
+          latest.isRead = true;
+        }
+        setAnnouncement(latest);
+      } else {
+        setAnnouncement(null);
+      }
+    };
+    fetchAnnouncement();
+    // چک کردن هر ۳۰ ثانیه برای اطلاعیه جدید
+    const interval = setInterval(fetchAnnouncement, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ۴. هندلر کلیک روی نوتیف
   const handleNotifClick = (id: number, link: string) => {
     const newReadIds = [...readIds, String(id)];
     localStorage.setItem('readNotifs', JSON.stringify(newReadIds));
@@ -69,7 +99,21 @@ export default function Header({ userName, userImage }: { userName: string, user
     router.push(link);
   };
 
-  // ۴. هندلر خروج
+  // ۵. هندلر کلیک روی اطلاعیه
+  const handleAnnouncementClick = async () => {
+    setShowAnnouncement(!showAnnouncement);
+    if (announcement && !announcement.isRead) {
+      await markAnnouncementAsRead(announcement.id);
+      // به‌روزرسانی local storage
+      const readAnnouncements = JSON.parse(localStorage.getItem('readAnnouncements') || '[]');
+      readAnnouncements.push(announcement.id);
+      localStorage.setItem('readAnnouncements', JSON.stringify(readAnnouncements));
+      // به‌روزرسانی state
+      setAnnouncement({ ...announcement, isRead: true });
+    }
+  };
+
+  // ۶. هندلر خروج
   const handleLogout = async () => {
     try {
       await fetch('/api/logout', { method: 'POST' });
@@ -113,12 +157,12 @@ export default function Header({ userName, userImage }: { userName: string, user
 
       <div className="header-content" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
         
-        {/* بخش زنگوله */}
+        {/* بخش زنگوله (اعلان‌های سیستمی) */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowNotif(!showNotif)} style={{ position: 'relative', padding: '8px', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
-            <Bell style={{ width: '24px', height: '24px', color: '#475569' }} />
+          <button onClick={() => { setShowNotif(!showNotif); setShowAnnouncement(false); }} style={{ position: 'relative', padding: '8px', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
+            <Bell style={{ width: '24px', height: '24px', color: visibleNotifs.length > 0 ? '#ed6e2b' : '#475569' }} />
             {visibleNotifs.length > 0 && (
-              <span style={{ position: 'absolute', top: '4px', right: '4px', width: '10px', height: '10px', backgroundColor: '#ed6e2b', borderRadius: '50%', border: '2px solid white' }}></span>
+              <span style={{ position: 'absolute', top: '4px', right: '4px', width: '10px', height: '10px', backgroundColor: '#ef4444', borderRadius: '50%', border: '2px solid white' }}></span>
             )}
           </button>
 
@@ -139,7 +183,7 @@ export default function Header({ userName, userImage }: { userName: string, user
                 overflow: 'hidden' 
               }}>
                 <div style={{ padding: '16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#0f172a' }}>اعلان‌ها</h3>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#0f172a' }}>اعلان‌های سیستمی</h3>
                   <span style={{ fontSize: '11px', backgroundColor: '#fff7ed', color: '#c2410c', padding: '2px 8px', borderRadius: '20px', fontWeight: 600 }}>{visibleNotifs.length} جدید</span>
                 </div>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
@@ -162,6 +206,52 @@ export default function Header({ userName, userImage }: { userName: string, user
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* بخش اطلاعیه‌های مدیر (آیکون بلندگو) */}
+        <div style={{ position: 'relative' }}>
+          <button onClick={handleAnnouncementClick} style={{ position: 'relative', padding: '8px', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
+            <Megaphone style={{ width: '24px', height: '24px', color: announcement && !announcement.isRead ? '#ed6e2b' : '#475569' }} />
+            {announcement && !announcement.isRead && (
+              <span style={{ position: 'absolute', top: '4px', right: '4px', width: '10px', height: '10px', backgroundColor: '#ef4444', borderRadius: '50%', border: '2px solid white' }}></span>
+            )}
+          </button>
+
+          {showAnnouncement && announcement && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowAnnouncement(false)} />
+              
+              <div style={{ 
+                position: 'absolute', 
+                left: '0', 
+                top: '50px', 
+                width: '340px', 
+                backgroundColor: 'white', 
+                borderRadius: '16px', 
+                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', 
+                border: '2px solid #3b82f6', 
+                zIndex: 50, 
+                overflow: 'hidden' 
+              }}>
+                <div style={{ padding: '16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', color: '#0f172a' }}>اطلاعیه مدیر</h3>
+                  <button onClick={() => setShowAnnouncement(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
+                </div>
+                
+                <div style={{ padding: '16px' }}>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>{announcement.title}</h4>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#475569', lineHeight: '1.5' }}>{announcement.content}</p>
+                  
+                  {announcement.fileUrl && (
+                    <a href={announcement.fileUrl} download style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '12px', color: '#3b82f6', fontSize: '14px', textDecoration: 'none' }}>
+                      <FileText size={16} /> دانلود فایل پیوست
+                    </a>
+                  )}
+                  <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '12px' }}>{new Date(announcement.createdAt).toLocaleDateString('fa-IR')}</p>
                 </div>
               </div>
             </>

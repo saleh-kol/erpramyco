@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createProjectAction } from "@/actions/projects";
 import {
-  Search, Plus, Briefcase, X, Save, CheckCircle, UserCircle2, Users, Check, Award, AlertTriangle, Calendar, Crown
+  Search, Plus, Briefcase, X, Save, CheckCircle, UserCircle2, Users, Check, Award, Calendar, Crown, Layers, Trash2, AlertTriangle
 } from "lucide-react";
 
 import DatePicker from "react-multi-date-picker";
@@ -16,12 +16,8 @@ const translateRole = (role: string) => {
   if (!role) return "-";
   const roles: any = {
     "Factory Manager": "مدیر کارخانه", "Factory_Manager": "مدیر کارخانه",
-    "ModirNet": "مدیر نت",
-    "Production Supervisor": "سرپرست تولید", "Production_Supervisor": "سرپرست تولید",
-    "Repairer": "تعمیرکار",
-    "Operator": "اپراتور",
-    "Commerce": "بازرگانی",
-    "Contractor": "پیمانکار"
+    "ModirNet": "مدیر نت", "Production Supervisor": "سرپرست تولید", "Production_Supervisor": "سرپرست تولید",
+    "Repairer": "تعمیرکار", "Operator": "اپراتور", "Commerce": "بازرگانی", "Contractor": "پیمانکار"
   };
   return roles[role] || role.replace(/_/g, ' ');
 };
@@ -46,6 +42,14 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
   const [selectedPersonnel, setSelectedPersonnel] = useState<any[]>([]);
   const [projectLeaderId, setProjectLeaderId] = useState<string>("");
   
+  // استیت‌های فاز
+  const [projectPhases, setProjectPhases] = useState<any[]>([]);
+  const [phaseTitle, setPhaseTitle] = useState("");
+  const [phaseStart, setPhaseStart] = useState<any>(null);
+  const [phaseEnd, setPhaseEnd] = useState<any>(null);
+  const [phaseMembers, setPhaseMembers] = useState<Record<number, boolean>>({});
+  const [phaseLeaderId, setPhaseLeaderId] = useState<string>("");
+
   const [toast, setToast] = useState<string | null>(null);
 
   const [isMounted, setIsMounted] = useState(false);
@@ -72,10 +76,7 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
     setSelectedPersonnel(prev => {
       const exists = prev.find(item => item.Personnel_ID === p.Personnel_ID);
       if (exists) {
-        // اگر فرد حذف شده مسئول بود، مسئول را هم پاک کن
-        if (String(p.Personnel_ID) === projectLeaderId) {
-          setProjectLeaderId("");
-        }
+        if (String(p.Personnel_ID) === projectLeaderId) setProjectLeaderId("");
         return prev.filter(item => item.Personnel_ID !== p.Personnel_ID);
       } else {
         return [...prev, p];
@@ -83,10 +84,59 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
     });
   };
 
+  const updatePersonnelRole = (personnelId: number, role: string) => {
+    setSelectedPersonnel(prev => prev.map(p => p.Personnel_ID === personnelId ? { ...p, assignedRole: role } : p));
+  };
+
+  const updatePersonnelWage = (personnelId: number, wage: string) => {
+    setSelectedPersonnel(prev => prev.map(p => p.Personnel_ID === personnelId ? { ...p, personnelWage: wage } : p));
+  };
+
+  const togglePhaseMember = (id: number) => {
+    setPhaseMembers(prev => {
+      const newState = { ...prev };
+      if (newState[id]) {
+        delete newState[id];
+        if (String(id) === phaseLeaderId) setPhaseLeaderId("");
+      } else {
+        newState[id] = true;
+      }
+      return newState;
+    });
+  };
+
+  const handleAddPhase = () => {
+    const memberIds = Object.keys(phaseMembers).map(Number);
+    if (!phaseTitle || !phaseStart || !phaseEnd || memberIds.length === 0 || !phaseLeaderId) {
+      setToast("لطفاً نام فاز، تاریخ‌ها، اعضا و مسئول فاز را مشخص کنید");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    
+    const leaderName = selectedPersonnel.find(p => String(p.Personnel_ID) === phaseLeaderId)?.Full_Name || "";
+    setProjectPhases(prev => [...prev, {
+      title: phaseTitle,
+      startDate: formatToLocalISO(phaseStart),
+      endDate: formatToLocalISO(phaseEnd),
+      members: memberIds,
+      leaderId: phaseLeaderId,
+      leaderName: leaderName
+    }]);
+    
+    setPhaseTitle("");
+    setPhaseStart(null);
+    setPhaseEnd(null);
+    setPhaseMembers({});
+    setPhaseLeaderId("");
+  };
+
+  const removePhase = (index: number) => {
+    setProjectPhases(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // اعتبارسنجی: اگر تیم انتخاب شده ولی مسئول انتخاب نشده
     if (selectedPersonnel.length > 0 && !projectLeaderId) {
       setToast("لطفاً مسئول پروژه را انتخاب کنید");
       setTimeout(() => setToast(null), 3000);
@@ -109,24 +159,30 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
     selectedPersonnel.forEach(p => {
       formData.append('personnelId', String(p.Personnel_ID));
       formData.append('personnelRole', p.assignedRole || 'عضو پروژه');
+      formData.append('personnelWage', p.personnelWage || '0');
     });
+
+    projectPhases.forEach((ph, index) => {
+      formData.append(`phaseTitle_${index}`, ph.title);
+      formData.append(`phaseStart_${index}`, ph.startDate);
+      formData.append(`phaseEnd_${index}`, ph.endDate);
+      formData.append(`phaseLeaderId_${index}`, ph.leaderId);
+      
+      ph.members.forEach((mId: number, mIndex: number) => {
+        formData.append(`phaseMember_${index}_${mIndex}`, String(mId));
+      });
+      formData.append(`phaseMemberCount_${index}`, String(ph.members.length));
+    });
+    formData.append('phaseCount', String(projectPhases.length));
     
     await createProjectAction(formData);
     setIsModalOpen(false);
     setSelectedPersonnel([]);
+    setProjectPhases([]);
     setProjectLeaderId("");
-    setStartDateVal(null);
-    setGoldenDateVal(null);
-    setEndDateVal(null);
-    setDeadlineDateVal(null);
+    setStartDateVal(null); setGoldenDateVal(null); setEndDateVal(null); setDeadlineDateVal(null);
     setToast("پروژه با موفقیت ثبت شد");
     setTimeout(() => setToast(null), 3000);
-  };
-
-  const updatePersonnelRole = (personnelId: number, role: string) => {
-    setSelectedPersonnel(prev => 
-      prev.map(p => p.Personnel_ID === personnelId ? { ...p, assignedRole: role } : p)
-    );
   };
 
   const inputStyle: React.CSSProperties = { width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #e2e8f0", outline: "none", fontSize: "14px", fontFamily: "inherit", backgroundColor: "#f8fafc", boxSizing: "border-box" };
@@ -140,10 +196,10 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
         .rmdp-day.rmdp-today span { background: #ed6e2b !important; color: white !important; }
         .rmdp-selected span { background: #ed6e2b !important; color: white !important; }
         .erp-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn 0.2s ease-out; }
-        .erp-modal-container { background: white; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; border-top: 4px solid #ed6e2b; animation: scaleIn 0.2s ease-out; }
+        .erp-modal-container { background: white; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; max-width: 900px; max-height: 90vh; overflow-y: auto; border-top: 4px solid #ed6e2b; animation: scaleIn 0.2s ease-out; }
         .erp-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: white; z-index: 10; border-radius: 20px 20px 0 0; }
         .erp-modal-body { padding: 24px; }
-        .erp-input { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #e2e8f0; outline: none; font-size: 14px; font-family: inherit; background-color: #f8fafc; transition: all 0.2s; box-sizing: border-box; }
+        .erp-input { width: 100%; padding: 12px 16px"; border-radius: 10px; border: 1px solid #e2e8f0; outline: none; font-size: 14px; font-family: inherit; background-color: #f8fafc; transition: all 0.2s; box-sizing: border-box; }
         .erp-input:focus { border-color: #ed6e2b; background-color: white; box-shadow: 0 0 0 3px rgba(237, 110, 43, 0.1); }
         .erp-btn-close { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: none; background: #f1f5f9; color: #64748b; cursor: pointer; transition: all 0.2s; }
         .erp-btn-close:hover { background: #e2e8f0; color: #0f172a; transform: rotate(90deg); }
@@ -166,7 +222,6 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
             <button onClick={() => handleTabChange("Active")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "Active" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "Active" ? "white" : "#64748b" }}>در حال انجام</button>
             <button onClick={() => handleTabChange("Completed")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "Completed" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "Completed" ? "white" : "#64748b" }}>اتمام یافته</button>
             <button onClick={() => handleTabChange("OnHold")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "OnHold" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "OnHold" ? "white" : "#64748b" }}>در انتظار</button>
-            <button onClick={() => handleTabChange("Cancelled")} style={{ padding: "10px 20px", borderRadius: "10px", border: "none", cursor: "pointer", fontWeight: "bold", backgroundColor: currentStatus === "Cancelled" ? "#ed6e2b" : "#f1f5f9", color: currentStatus === "Cancelled" ? "white" : "#64748b" }}>لغو شده</button>
           </div>
         </div>
         <button onClick={() => setIsModalOpen(true)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 24px", background: "linear-gradient(135deg, #ed6e2b 0%, #ea580c 100%)", color: "white", border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: "bold", boxShadow: "0 4px 6px -1px rgba(237, 110, 43, 0.2)" }}>
@@ -176,43 +231,58 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
 
       {/* جدول پروژه‌ها */}
       <div style={{ backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ backgroundColor: "#f8fafc", textAlign: "right" }}>
-              <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>کد پروژه</th>
-              <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>نام پروژه</th>
-              <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>👑 مسئول پروژه</th>
-              <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>بودجه</th>
-              <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>تاریخ طلایی</th>
-              <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>تاریخ پایان</th>
-              <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>دیرکرد</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProjects.map((p: any) => (
-              <tr key={p.Project_ID} onClick={() => router.push(`/dashboard/projects/${p.Project_ID}`)} style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#fffbf5"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}>
-                <td style={{ padding: "16px", fontSize: "14px", color: "#334155", fontWeight: 600 }}>{p.Project_Code}</td>
-                <td style={{ padding: "16px", fontSize: "14px", color: "#0f172a", fontWeight: 600 }}>{p.Project_Name}</td>
-                <td style={{ padding: "16px", fontSize: "14px", color: "#92400e", fontWeight: 600 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                    <Crown style={{ width: "14px", height: "14px", color: "#d97706" }} />
-                    {p.Project_Leader?.Full_Name || "-"}
-                  </div>
-                </td>
-                <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>{Number(p.Budget || 0).toLocaleString('fa-IR')} ریال</td>
-                <td style={{ padding: "16px", fontSize: "14px", color: "#c2410c", fontWeight: 600 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                    <Award style={{ width: "14px", height: "14px" }} />
-                    {toPersianDate(p.Golden_Date)}
-                  </div>
-                </td>
-                <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>{toPersianDate(p.End_Date)}</td>
-                <td style={{ padding: "16px", fontSize: "14px", color: "#ef4444" }}>{toPersianDate(p.Deadline_Date)}</td>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "1100px" }}>
+            <thead>
+              <tr style={{ backgroundColor: "#f8fafc", textAlign: "right" }}>
+                <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>کد پروژه</th>
+                <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>نام پروژه</th>
+                <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>👑 مسئول پروژه</th>
+                <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>بودجه</th>
+                <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>تاریخ طلایی</th>
+                <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>تاریخ پایان</th>
+                {/* ستون‌های جدید */}
+                <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>تاریخ تاخیر</th>
+                <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>ضریب رضایت مدیر</th>
               </tr>
-            ))}
-            {filteredProjects.length === 0 && (<tr><td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>پروژه‌ای یافت نشد</td></tr>)}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredProjects.map((p: any) => (
+                <tr key={p.Project_ID} onClick={() => router.push(`/dashboard/projects/${p.Project_ID}`)} style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#fffbf5"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}>
+                  <td style={{ padding: "16px", fontSize: "14px", color: "#334155", fontWeight: 600 }}>{p.Project_Code}</td>
+                  <td style={{ padding: "16px", fontSize: "14px", color: "#0f172a", fontWeight: 600 }}>{p.Project_Name}</td>
+                  <td style={{ padding: "16px", fontSize: "14px", color: "#92400e", fontWeight: 600 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Crown style={{ width: "14px", height: "14px", color: "#d97706" }} />
+                      {p.Project_Leader?.Full_Name || "-"}
+                    </div>
+                  </td>
+                  <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>{Number(p.Budget || 0).toLocaleString('fa-IR')} ریال</td>
+                  <td style={{ padding: "16px", fontSize: "14px", color: "#c2410c", fontWeight: 600 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Award style={{ width: "14px", height: "14px" }} />
+                      {toPersianDate(p.Golden_Date)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>{toPersianDate(p.End_Date)}</td>
+                  {/* مقادیر ستون‌های جدید */}
+                  <td style={{ padding: "16px", fontSize: "14px", color: "#ef4444", fontWeight: 600 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <AlertTriangle style={{ width: "14px", height: "14px" }} />
+                      {toPersianDate(p.Deadline_Date)}
+                    </div>
+                  </td>
+                  <td style={{ padding: "16px", fontSize: "14px", fontWeight: "bold" }}>
+                    <span style={{ padding: "4px 8px", borderRadius: "6px", backgroundColor: p.Manager_Score ? "#f0fdf4" : "#f1f5f9", color: p.Manager_Score ? "#166534" : "#64748b" }}>
+                      {p.Manager_Score ? `${p.Manager_Score}%` : "ثبت نشده"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {filteredProjects.length === 0 && (<tr><td colSpan={8} style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>پروژه‌ای یافت نشد</td></tr>)}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* پاپ‌آپ افزودن پروژه */}
@@ -235,8 +305,8 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
               
               <div><label style={labelStyle}>کد پروژه *</label><input name="projectCode" required type="text" className="erp-input" placeholder="مثال: PRJ-001" /></div>
               <div><label style={labelStyle}>نام پروژه *</label><input name="projectName" required type="text" className="erp-input" placeholder="نام پروژه" /></div>
-              <div style={{ gridColumn: "1 / -1" }}><label style={labelStyle}>شرح پروژه</label><textarea name="description" rows={3} className="erp-input" style={{ resize: "vertical" }} placeholder="توضیحات پروژه..."></textarea></div>
-              <div><label style={labelStyle}>بودجه (ریال)</label><input name="budget" type="number" min="0" className="erp-input" placeholder="0" /></div>
+              <div style={{ gridColumn: "1 / -1" }}><label style={labelStyle}>شرح پروژه</label><textarea name="description" rows={2} className="erp-input" style={{ resize: "vertical" }} placeholder="توضیحات پروژه..."></textarea></div>
+              <div><label style={labelStyle}>بودجه کل (ریال)</label><input name="budget" type="number" min="0" className="erp-input" placeholder="0" /></div>
               <div><label style={labelStyle}>تاریخ شروع</label>{isMounted ? <DatePicker value={startDateVal} calendar={persian} locale={persian_fa} calendarPosition="bottom-right" onChange={setStartDateVal} format="YYYY/MM/DD" style={dateInputStyle} /> : <input type="text" className="erp-input" disabled />}</div>
 
               <div style={{ gridColumn: "1 / -1", marginTop: "12px" }}>
@@ -246,31 +316,26 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
               <div>
                 <label style={{ ...labelStyle, color: "#c2410c" }}>🥇 تاریخ طلایی *</label>
                 {isMounted ? <DatePicker value={goldenDateVal} calendar={persian} locale={persian_fa} calendarPosition="bottom-right" onChange={setGoldenDateVal} format="YYYY/MM/DD" style={{ ...dateInputStyle, border: "1px solid #fed7aa", backgroundColor: "#fff7ed" }} /> : <input type="text" className="erp-input" disabled />}
-                <p style={{ margin: "4px 0 0 0", fontSize: "10px", color: "#c2410c" }}>تحویل قبل از این تاریخ = پاداش</p>
               </div>
               <div>
                 <label style={labelStyle}>📅 تاریخ پایان *</label>
                 {isMounted ? <DatePicker value={endDateVal} calendar={persian} locale={persian_fa} calendarPosition="bottom-right" onChange={setEndDateVal} format="YYYY/MM/DD" style={dateInputStyle} /> : <input type="text" className="erp-input" disabled />}
-                <p style={{ margin: "4px 0 0 0", fontSize: "10px", color: "#64748b" }}>تحویل در این بازه = بدون تغییر</p>
               </div>
               <div>
                 <label style={{ ...labelStyle, color: "#ef4444" }}>⏰ تاریخ دیرکرد (حد نهایی) *</label>
                 {isMounted ? <DatePicker value={deadlineDateVal} calendar={persian} locale={persian_fa} calendarPosition="bottom-right" onChange={setDeadlineDateVal} format="YYYY/MM/DD" style={{ ...dateInputStyle, border: "1px solid #fecaca", backgroundColor: "#fef2f2" }} /> : <input type="text" className="erp-input" disabled />}
-                <p style={{ margin: "4px 0 0 0", fontSize: "10px", color: "#ef4444" }}>بعد از این تاریخ = لغو پروژه</p>
               </div>
               <div>
                 <label style={labelStyle}>درصد پاداش طلایی (%)</label>
                 <input name="goldenBonusPercent" type="number" min="0" max="100" className="erp-input" placeholder="مثلاً 20" />
-                <p style={{ margin: "4px 0 0 0", fontSize: "10px", color: "#16a34a" }}>اضافه به مبلغ پروژه</p>
               </div>
               <div>
                 <label style={labelStyle}>درصد جریمه دیرکرد (%)</label>
                 <input name="delayPenaltyPercent" type="number" min="0" max="100" className="erp-input" placeholder="مثلاً 15" />
-                <p style={{ margin: "4px 0 0 0", fontSize: "10px", color: "#ef4444" }}>کسر از مبلغ پروژه</p>
               </div>
 
               <div style={{ gridColumn: "1 / -1", marginTop: "12px" }}>
-                <h3 className="erp-section-title"><Users style={{ width: "16px", height: "16px", color: "#ed6e2b" }} /> تیم پروژه</h3>
+                <h3 className="erp-section-title"><Users style={{ width: "16px", height: "16px", color: "#ed6e2b" }} /> تیم پروژه و دستمزد</h3>
               </div>
 
               <div style={{ gridColumn: "1 / -1" }}>
@@ -279,32 +344,30 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
                     {selectedPersonnel.map((p: any) => (
                       <div key={p.Personnel_ID} style={{ 
                         backgroundColor: String(p.Personnel_ID) === projectLeaderId ? "#fef3c7" : "#f8fafc", 
-                        padding: "12px", 
-                        borderRadius: "10px", 
-                        display: "flex", 
-                        alignItems: "center", 
-                        gap: "12px", 
+                        padding: "12px", borderRadius: "10px", display: "flex", alignItems: "center", gap: "12px", 
                         border: String(p.Personnel_ID) === projectLeaderId ? "1px solid #fde68a" : "1px solid #e2e8f0"
                       }}>
                         <div style={{ width: "36px", height: "36px", borderRadius: "50%", overflow: "hidden", flexShrink: 0 }}>
                           {p.Personal_Image_Path ? <img src={p.Personal_Image_Path} alt={p.Full_Name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UserCircle2 style={{ width: "100%", height: "100%", color: "#cbd5e1" }} />}
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "#0f172a", display: "flex", alignItems: "center", gap: "4px" }}>
-                            {p.Full_Name}
-                            {String(p.Personnel_ID) === projectLeaderId && <Crown style={{ width: "14px", height: "14px", color: "#d97706" }} />}
-                          </p>
-                          <input 
-                            type="text" 
-                            value={p.assignedRole || ""}
-                            onChange={(e) => updatePersonnelRole(p.Personnel_ID, e.target.value)}
-                            placeholder="نقش در پروژه..."
-                            style={{ width: "100%", marginTop: "4px", padding: "6px 10px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", fontFamily: "inherit", backgroundColor: "white", boxSizing: "border-box" }}
-                          />
+                        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                          <div>
+                            <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "#0f172a", display: "flex", alignItems: "center", gap: "4px" }}>
+                              {p.Full_Name}
+                              {String(p.Personnel_ID) === projectLeaderId && <Crown style={{ width: "14px", height: "14px", color: "#d97706" }} />}
+                            </p>
+                            <input type="text" value={p.assignedRole || ""} onChange={(e) => updatePersonnelRole(p.Personnel_ID, e.target.value)} placeholder="نقش..." style={{ width: "100%", marginTop: "4px", padding: "6px 10px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", fontFamily: "inherit", backgroundColor: "white", boxSizing: "border-box" }} />
+                          </div>
+                          <div>
+                            <label style={{ display: "block", fontSize: "10px", color: "#64748b", marginBottom: "4px" }}>دستمزد (ریال)</label>
+                            <input type="number" min="0" value={p.personnelWage || ""} onChange={(e) => updatePersonnelWage(p.Personnel_ID, e.target.value)} placeholder="0" style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", fontFamily: "inherit", backgroundColor: "white", boxSizing: "border-box" }} />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
+                            <button type="button" onClick={() => togglePersonnelSelection(p)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef4444", padding: "4px" }}>
+                              <X style={{ width: "16px", height: "16px" }} />
+                            </button>
+                          </div>
                         </div>
-                        <button type="button" onClick={() => togglePersonnelSelection(p)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef4444", padding: "4px" }}>
-                          <X style={{ width: "16px", height: "16px" }} />
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -313,31 +376,90 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
                   <Users style={{ width: "18px", height: "18px" }} /> انتخاب از لیست پرسنل
                 </button>
 
-                {/* انتخاب مسئول پروژه */}
                 {selectedPersonnel.length > 0 && (
                   <div style={{ marginTop: "16px", backgroundColor: "#fef3c7", padding: "16px", borderRadius: "10px", border: "1px solid #fde68a" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 700, color: "#92400e", marginBottom: "8px" }}>
                       <Crown style={{ width: "16px", height: "16px", color: "#d97706" }} />
-                      انتخاب مسئول پروژه *
+                      انتخاب مسئول کل پروژه *
                     </label>
-                    <select 
-                      value={projectLeaderId}
-                      onChange={(e) => setProjectLeaderId(e.target.value)}
-                      className="erp-input"
-                      style={{ border: "1px solid #fde68a", backgroundColor: "white" }}
-                    >
+                    <select value={projectLeaderId} onChange={(e) => setProjectLeaderId(e.target.value)} className="erp-input" style={{ border: "1px solid #fde68a", backgroundColor: "white" }}>
                       <option value="">انتخاب کنید...</option>
                       {selectedPersonnel.map(p => (
-                        <option key={p.Personnel_ID} value={p.Personnel_ID}>
-                          {p.Full_Name} - {p.assignedRole || 'عضو پروژه'}
-                        </option>
+                        <option key={p.Personnel_ID} value={p.Personnel_ID}>{p.Full_Name}</option>
                       ))}
                     </select>
-                    <p style={{ margin: "8px 0 0 0", fontSize: "11px", color: "#92400e" }}>
-                      ⚠️ ثبت اتمام پروژه فقط توسط این فرد انجام می‌شود.
-                    </p>
                   </div>
                 )}
+              </div>
+
+              <div style={{ gridColumn: "1 / -1", marginTop: "12px" }}>
+                <h3 className="erp-section-title"><Layers style={{ width: "16px", height: "16px", color: "#ed6e2b" }} /> فازها / مراحل پروژه</h3>
+              </div>
+
+              <div style={{ gridColumn: "1 / -1", backgroundColor: "#f8fafc", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                {projectPhases.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+                    {projectPhases.map((ph, index) => (
+                      <div key={index} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid #f1f5f9" }}>
+                        <div>
+                          <span style={{ fontSize: "14px", fontWeight: "bold", color: "#0f172a" }}>{ph.title}</span>
+                          <span style={{ fontSize: "12px", color: "#64748b", marginRight: "12px" }}>
+                            👑 مسئول: {ph.leaderName} | از {toPersianDate(ph.startDate)} تا {toPersianDate(ph.endDate)} | {ph.members.length} نفر
+                          </span>
+                        </div>
+                        <button type="button" onClick={() => removePhase(index)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef4444" }}>
+                          <Trash2 style={{ width: "16px", height: "16px" }} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", color: "#64748b", marginBottom: "4px" }}>نام فاز</label>
+                    <input type="text" value={phaseTitle} onChange={(e) => setPhaseTitle(e.target.value)} placeholder="مثلاً طراحی" className="erp-input" style={{ padding: "8px 12px", fontSize: "13px" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", color: "#64748b", marginBottom: "4px" }}>تاریخ شروع</label>
+                    {isMounted ? <DatePicker value={phaseStart} calendar={persian} locale={persian_fa} calendarPosition="bottom-right" onChange={setPhaseStart} format="YYYY/MM/DD" style={{ ...dateInputStyle, padding: "8px", fontSize: "13px" }} /> : <input className="erp-input" disabled />}
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", color: "#64748b", marginBottom: "4px" }}>تاریخ پایان</label>
+                    {isMounted ? <DatePicker value={phaseEnd} calendar={persian} locale={persian_fa} calendarPosition="bottom-right" onChange={setPhaseEnd} format="YYYY/MM/DD" style={{ ...dateInputStyle, padding: "8px", fontSize: "13px" }} /> : <input className="erp-input" disabled />}
+                  </div>
+                </div>
+
+                {selectedPersonnel.length > 0 ? (
+                  <div style={{ backgroundColor: "white", padding: "12px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                    <p style={{ margin: "0 0 8px 0", fontSize: "12px", fontWeight: "600", color: "#475569" }}>اعضای این فاز را انتخاب و مسئول را مشخص کنید:</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", maxHeight: "150px", overflowY: "auto", padding: "4px" }}>
+                      {selectedPersonnel.map(p => {
+                        const isChecked = !!phaseMembers[p.Personnel_ID];
+                        return (
+                          <div key={p.Personnel_ID} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px", borderRadius: "6px", backgroundColor: isChecked ? "#fff7ed" : "#f8fafc", border: `1px solid ${isChecked ? "#fed7aa" : "#f1f5f9"}` }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "13px", color: "#334155" }}>
+                              <input type="checkbox" checked={isChecked} onChange={() => togglePhaseMember(p.Personnel_ID)} style={{ accentColor: "#ed6e2b" }} />
+                              {p.Full_Name}
+                            </label>
+                            {isChecked && (
+                              <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#92400e", cursor: "pointer" }}>
+                                <input type="radio" name="phaseLeader" checked={String(p.Personnel_ID) === phaseLeaderId} onChange={() => setPhaseLeaderId(String(p.Personnel_ID))} style={{ accentColor: "#d97706" }} />
+                                👑 مسئول
+                              </label>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: "12px", color: "#94a3b8", textAlign: "center" }}>ابتدا تیم پروژه را انتخاب کنید</p>
+                )}
+
+                <button type="button" onClick={handleAddPhase} style={{ width: "100%", marginTop: "12px", padding: "10px", backgroundColor: "#1d4ed8", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                  <Plus style={{ width: "16px", height: "16px" }} /> افزودن این فاز به پروژه
+                </button>
               </div>
 
               <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", paddingTop: "12px", borderTop: "1px solid #f1f5f9" }}>

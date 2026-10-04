@@ -29,6 +29,8 @@ export default function EditPersonnelClient({ personnel, positions, units }: { p
     });
   };
 
+  const username = personnel.Users?.[0]?.Username || "بدون کاربر";
+
   return (
     <div className="erp-dashboard-container">
       <style>{`
@@ -64,6 +66,12 @@ export default function EditPersonnelClient({ personnel, positions, units }: { p
           transition: all 0.2s; box-sizing: border-box;
         }
         .erp-form-input:focus { border-color: #ed6e2b; background-color: white; box-shadow: 0 0 0 3px rgba(237, 110, 43, 0.1); }
+        .erp-form-input:disabled {
+          background-color: #f1f5f9;
+          color: #64748b;
+          cursor: not-allowed;
+          border-color: #e2e8f0;
+        }
         .erp-section-title {
           display: flex; align-items: center; gap: 8px; margin: 0 0 20px 0;
           font-size: 16px; font-weight: bold; color: #334155;
@@ -106,11 +114,21 @@ export default function EditPersonnelClient({ personnel, positions, units }: { p
             </div>
             
             <div className="erp-form-group">
+              <label className="erp-form-label">نام کاربری (سیستمی)</label>
+              <input 
+                type="text" 
+                className="erp-form-input" 
+                value={username} 
+                disabled 
+              />
+            </div>
+
+            <div className="erp-form-group">
               <label className="erp-form-label">جایگاه سازمانی</label>
               <select name="positionId" className="erp-form-input" defaultValue={personnel.Position_ID || ""}>
                 <option value="">بدون جایگاه</option>
                 {positions.map((pos: any) => (
-                  <option key={pos.Position_ID} value={pos.Position_ID} selected={personnel.Position_ID === pos.Position_ID}>
+                  <option key={pos.Position_ID} value={pos.Position_ID}>
                     {pos.Name}
                   </option>
                 ))}
@@ -122,7 +140,7 @@ export default function EditPersonnelClient({ personnel, positions, units }: { p
               <select name="unitId" className="erp-form-input" defaultValue={personnel.Unit_ID || ""}>
                 <option value="">بدون واحد</option>
                 {units.map((unit: any) => (
-                  <option key={unit.Unit_ID} value={unit.Unit_ID} selected={personnel.Unit_ID === unit.Unit_ID}>
+                  <option key={unit.Unit_ID} value={unit.Unit_ID}>
                     {unit.Name}
                   </option>
                 ))}
@@ -131,7 +149,7 @@ export default function EditPersonnelClient({ personnel, positions, units }: { p
             
             <div className="erp-form-group">
               <label className="erp-form-label">نوع استخدام *</label>
-              <select name="employmentType" required className="erp-form-input" defaultValue={personnel.Employment_Type}>
+              <select name="employmentType" required className="erp-form-input" defaultValue={personnel.Employment_Type || "Official"}>
                 <option value="Official">رسمی</option>
                 <option value="Contractual">قراردادی</option>
                 <option value="PartTime">پاره‌وقت</option>

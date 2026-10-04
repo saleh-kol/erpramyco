@@ -30,7 +30,7 @@ export async function createManualActivityAction(formData: FormData) {
   if (!session) return { error: "نشست نامعتبر است" };
 
   const user = await verifySession(session);
-  if (!user) return { error: "نشست نامعتبر است" }; // درست شد
+  if (!user) return { error: "نشست نامعتبر است" };
 
   const dbUser = await prisma.users.findUnique({ where: { User_ID: user.userId } });
   if (!dbUser || !dbUser.Personnel_ID) return { error: "پروفایل پرسنلی یافت نشد" };
@@ -56,6 +56,8 @@ export async function createManualActivityAction(formData: FormData) {
   }
 
   let checkOutDate = null;
+  let workHours = 0;
+
   if (checkOutTime) {
     checkOutDate = new Date(today);
     const [h, m] = checkOutTime.split(':');
@@ -64,6 +66,45 @@ export async function createManualActivityAction(formData: FormData) {
     if (checkOutDate < checkInDate) {
       checkOutDate.setDate(checkOutDate.getDate() + 1);
     }
+    
+    // --- اعتبارسنجی ساعت شروع و پایان ---
+    const [outH, outM] = checkOutTime.split(':').map(Number);
+    const [inH, inM] = checkInTime.split(':').map(Number);
+    if (outH * 60 + outM <= inH * 60 + inM) {
+      return { error: "ساعت پایان باید بعد از ساعت شروع باشد." };
+    }
+
+    // --- بررسی تداخل زمانی با فعالیت‌های قبلی امروز ---
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const existingReports = await prisma.pR_Daily_Reports.findMany({
+      where: {
+        Personnel_ID: dbUser.Personnel_ID,
+        Report_Date: { gte: todayStart, lte: todayEnd }
+      }
+    });
+
+    for (const report of existingReports) {
+      if (report.Check_In && report.Check_Out) {
+        const existStart = new Date(report.Check_In).getTime();
+        const existEnd = new Date(report.Check_Out).getTime();
+        const newStart = checkInDate.getTime();
+        const newEnd = checkOutDate.getTime();
+
+        // فرمول تداخل: اگر شروع جدید قبل از پایان قدیمی باشد و پایان جدید بعد از شروع قدیمی باشد
+        if (newStart < existEnd && newEnd > existStart) {
+          return { error: "بازه زمانی این فعالیت با فعالیت‌های قبلی شما در امروز تداخل دارد. لطفاً زمان دیگری را انتخاب کنید." };
+        }
+      }
+    }
+    // ---------------------------------------------
+
+    // --- محاسبه ساعت سپری شده ---
+    const diffMs = checkOutDate.getTime() - checkInDate.getTime();
+    workHours = diffMs / (1000 * 60 * 60); // تبدیل به ساعت اعشاری
   }
 
   let missionDest = null;
@@ -79,6 +120,7 @@ export async function createManualActivityAction(formData: FormData) {
         Report_Date: today,
         Check_In: checkInDate,
         Check_Out: checkOutDate,
+        Work_Hours: parseFloat(workHours.toFixed(2)),
         Report_Status: checkOutDate ? 'Submitted' : 'Draft',
         Work_Type_ID: workTypeId,
         Location_ID: locationId,
@@ -86,7 +128,8 @@ export async function createManualActivityAction(formData: FormData) {
         Is_Mission: category === 'mission',
         Mission_Destination: missionDest,
         Work_Description: taskId ? `انجام ابلاغیه شماره ${taskId}\n${description}` : description,
-        Manager_Score: difficulty
+        Manager_Score: 100,
+        Difficulty: difficulty ? parseFloat(difficulty.toString()) : 1
       }
     });
     revalidatePath('/dashboard/attendance');
@@ -95,7 +138,6 @@ export async function createManualActivityAction(formData: FormData) {
     return { error: `خطا در ثبت فعالیت: ${error.message}` };
   }
 }
-
 // ۳. گرفتن گزینه‌های فرم
 export async function getActivityFormOptions() {
   const cookieStore = await cookies();
@@ -120,7 +162,7 @@ export async function getActivityFormOptions() {
       where: { Personnel_ID: dbUser.Personnel_ID, Is_Active: true, PR_Projects: { Status: 'Active' } },
       include: { PR_Projects: true }
     });
-    projects = assignments.map(a => a.PR_Projects);
+    projects = assignments.map((a: any) => a.PR_Projects);
 
     // ابلاغیه‌های در انتظار انجام
     tasks = await prisma.pR_Tasks.findMany({

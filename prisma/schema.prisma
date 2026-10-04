@@ -6,6 +6,8 @@ datasource db {
   provider = "mysql"
 }
 
+// ... (مدل‌های Contractors تا PR_Leave_Requests بدون تغییر باقی می‌مانند اما برای کامل بودن فایل آورده شده‌اند)
+
 model Contractors {
   Contractor_ID          Int                      @id @default(autoincrement())
   Company_Name           String                   @db.VarChar(150)
@@ -16,7 +18,6 @@ model Contractors {
   IsActive               Boolean?                 @default(true)
   KPI_Seasonal_Snapshots KPI_Seasonal_Snapshots[]
   Work_Orders            Work_Orders[]
-  Work_Orders_Archive    Work_Orders_Archive[]
 }
 
 model Equipment {
@@ -36,7 +37,6 @@ model Equipment {
   Equipment_Spare_Parts Equipment_Spare_Parts[]
   PM_Schedules          PM_Schedules[]
   Work_Orders           Work_Orders[]
-  Work_Orders_Archive   Work_Orders_Archive[]
 
   @@index([Equipment_Code], map: "IX_Equipment_Code")
   @@index([Machine_ID], map: "IX_Equipment_MachineID")
@@ -56,11 +56,10 @@ model Equipment_Spare_Parts {
 }
 
 model Failure_Codes {
-  Failure_ID          Int                   @id @default(autoincrement())
-  Failure_Code        String                @unique(map: "Failure_Code") @db.VarChar(30)
-  Failure_Name        String                @db.VarChar(100)
+  Failure_ID          Int           @id @default(autoincrement())
+  Failure_Code        String        @unique(map: "Failure_Code") @db.VarChar(30)
+  Failure_Name        String        @db.VarChar(100)
   Work_Orders         Work_Orders[]
-  Work_Orders_Archive Work_Orders_Archive[]
 }
 
 model KPI_Seasonal_Snapshots {
@@ -112,19 +111,17 @@ model Machines {
   Supervisor_Machines     Supervisor_Machines[]
   TPM_Checklist_Templates TPM_Checklist_Templates[]
   Work_Orders             Work_Orders[]
-  Work_Orders_Archive     Work_Orders_Archive[]
 
   @@index([Line_ID], map: "IX_Machines_LineID")
   @@index([Machine_Status], map: "IX_Machines_Status")
 }
 
 model Maintenance_Strategies {
-  Strategy_ID         Int                   @id @default(autoincrement())
-  Strategy_Code       String                @unique(map: "Strategy_Code") @db.VarChar(10)
-  Strategy_Name       String                @db.VarChar(50)
+  Strategy_ID         Int               @id @default(autoincrement())
+  Strategy_Code       String            @unique(map: "Strategy_Code") @db.VarChar(10)
+  Strategy_Name       String            @db.VarChar(50)
   PM_Schedules        PM_Schedules[]
   Work_Orders         Work_Orders[]
-  Work_Orders_Archive Work_Orders_Archive[]
 }
 
 model PM_Schedules {
@@ -165,6 +162,7 @@ model PR_Commute_Logs {
   Commute_ID                                        Int                           @id @default(autoincrement())
   Personnel_ID                                      Int
   Commute_Date                                      DateTime                      @db.Date
+  Commute_Duration                                  Decimal?                       @db.Decimal(5, 2) 
   Commute_Type                                      PR_Commute_Logs_Commute_Type? @default(PersonalVehicle)
   Status                                            PR_Commute_Logs_Status        @default(Pending)
   Origin                                            String?                       @db.VarChar(255)
@@ -192,9 +190,10 @@ model PR_Daily_Reports {
   Report_ID                                          Int                              @id @default(autoincrement())
   Personnel_ID                                       Int
   Report_Date                                        DateTime                         @db.Date
-  Check_In                                           DateTime?                        @db.Time(0)
-  Check_Out                                          DateTime?                        @db.Time(0)
+  Check_In                                           DateTime?                        
+  Check_Out                                          DateTime?                        
   Work_Hours                                         Decimal?                         @db.Decimal(5, 2)
+  Effective_Hours                                    Decimal?                         @db.Decimal(5, 2) // اصلاح ۲: کش ساعت موثر
   Work_Type_ID                                       Int?
   Location_ID                                        Int?
   Project_ID                                         Int?
@@ -205,6 +204,7 @@ model PR_Daily_Reports {
   Commute_Cost                                       Decimal?                         @default(0.00) @db.Decimal(18, 2)
   Report_Status                                      PR_Daily_Reports_Report_Status?  @default(Draft)
   Manager_Score                                      Decimal?                         @db.Decimal(5, 2)
+  Difficulty                                         Decimal?                         @default(1) @db.Decimal(5, 2)
   Manager_Comment                                    String?                          @db.VarChar(500)
   Manager_ID                                         Int?
   Reviewed_At                                        DateTime?                        @db.DateTime(0)
@@ -355,11 +355,12 @@ model PR_Personnel_Finance {
   OffHours_Multiplier                                    Decimal    @default(1.80) @db.Decimal(5, 2)
   Min_Weekly_Hours                                       Decimal    @default(44.00) @db.Decimal(5, 2)
   Max_Weekly_Overtime                                    Decimal    @default(20.00) @db.Decimal(5, 2)
-  Holiday_Hour_Multiplier     Decimal? @default(0) @db.Decimal(5, 2)
-  Friday_Hour_Multiplier      Decimal? @default(0) @db.Decimal(5, 2)
-  Mission_Regular_Multiplier  Decimal? @default(0) @db.Decimal(5, 2)
-  Mission_Friday_Multiplier   Decimal? @default(0) @db.Decimal(5, 2)
-  Mission_Holiday_Multiplier  Decimal? @default(0) @db.Decimal(5, 2)
+  // اصلاح ۱: مقادیر پیش‌فرض 0 به null تغییر یافتند تا از تنظیمات کلی ارث‌بری کنند
+  Holiday_Hour_Multiplier     Decimal?                   @db.Decimal(5, 2)
+  Friday_Hour_Multiplier      Decimal?                   @db.Decimal(5, 2)
+  Mission_Regular_Multiplier  Decimal?                   @db.Decimal(5, 2)
+  Mission_Friday_Multiplier   Decimal?                   @db.Decimal(5, 2)
+  Mission_Holiday_Multiplier  Decimal?                   @db.Decimal(5, 2)
   Commute_Amount                                         Decimal?   @default(0.00) @db.Decimal(18, 2)
   Mission_Daily_Amount                                   Decimal?   @default(0.00) @db.Decimal(18, 2)
   Currency                                               String?    @default("IRR") @db.VarChar(10)
@@ -368,18 +369,18 @@ model PR_Personnel_Finance {
   Food_Allowance                                         Decimal    @default(0) @db.Decimal(18, 2)
   Child_Allowance                                        Decimal    @default(0) @db.Decimal(18, 2)
   Is_Active                                              Boolean?   @default(true)
-  Week1_Max_Hours         Decimal? @default(0) @db.Decimal(5, 2)
-  Week1_Max_Overtime      Decimal? @default(0) @db.Decimal(5, 2)
-  Week2_Max_Hours         Decimal? @default(0) @db.Decimal(5, 2)
-  Week2_Max_Overtime      Decimal? @default(0) @db.Decimal(5, 2)
-  Week3_Max_Hours         Decimal? @default(0) @db.Decimal(5, 2)
-  Week3_Max_Overtime      Decimal? @default(0) @db.Decimal(5, 2)
-  Week4_Max_Hours         Decimal? @default(0) @db.Decimal(5, 2)
-  Week4_Max_Overtime      Decimal? @default(0) @db.Decimal(5, 2)
-  MonthEnd_Max_Hours      Decimal? @default(0) @db.Decimal(5, 2)
-  MonthEnd_Max_Overtime   Decimal? @default(0) @db.Decimal(5, 2)
-  Max_Friday_Hours_Month  Decimal? @default(0) @db.Decimal(5, 2)
-  Max_Holiday_Hours_Month Decimal? @default(0) @db.Decimal(5, 2)
+  Week1_Max_Hours             Decimal?                   @db.Decimal(5, 2)
+  Week1_Max_Overtime          Decimal?                   @db.Decimal(5, 2)
+  Week2_Max_Hours             Decimal?                   @db.Decimal(5, 2)
+  Week2_Max_Overtime          Decimal?                   @db.Decimal(5, 2)
+  Week3_Max_Hours             Decimal?                   @db.Decimal(5, 2)
+  Week3_Max_Overtime          Decimal?                   @db.Decimal(5, 2)
+  Week4_Max_Hours             Decimal?                   @db.Decimal(5, 2)
+  Week4_Max_Overtime          Decimal?                   @db.Decimal(5, 2)
+  MonthEnd_Max_Hours          Decimal?                   @db.Decimal(5, 2)
+  MonthEnd_Max_Overtime       Decimal?                   @db.Decimal(5, 2)
+  Max_Friday_Hours_Month      Decimal?                   @db.Decimal(5, 2)
+  Max_Holiday_Hours_Month     Decimal?                   @db.Decimal(5, 2)
   Created_By                                             Int?
   Created_At                                             DateTime?  @default(now()) @db.DateTime(0)
   Updated_At                                             DateTime?  @default(now()) @db.DateTime(0)
@@ -400,6 +401,7 @@ model PR_Project_Assignments {
   Assigned_To         DateTime?   @db.Date
   Role_In_Project     String?     @db.VarChar(100)
   Project_Hourly_Rate Decimal?    @db.Decimal(18, 2)
+  Personnel_Wage      Decimal?    @default(0) @db.Decimal(18, 2) // <--- 
   Is_Active           Boolean?    @default(true)
   Created_At          DateTime?   @default(now()) @db.DateTime(0)
   Personnel           Personnel   @relation(fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Assign_Personnel")
@@ -415,36 +417,27 @@ model PR_Projects {
   Project_Name     String   @db.VarChar(150)
   Project_Leader_ID  Int?
   Description      String?  @db.Text
-  
-  // تاریخ‌ها
-  Start_Date       DateTime? @db.Date        // تاریخ شروع
-  Golden_Date      DateTime? @db.Date        // تاریخ طلایی
-  End_Date         DateTime? @db.Date        // تاریخ پایان
-  Deadline_Date    DateTime? @db.Date        // تاریخ دیرکرد (حد نهایی)
-  
-  // درصد‌های پاداش/جریمه
+  Start_Date       DateTime? @db.Date
+  Golden_Date      DateTime? @db.Date
+  End_Date         DateTime? @db.Date
+  Deadline_Date    DateTime? @db.Date
   Golden_Bonus_Percent  Decimal? @default(0) @db.Decimal(5, 2)
   Delay_Penalty_Percent Decimal? @default(0) @db.Decimal(5, 2)
-  
   Budget           Decimal  @default(0) @db.Decimal(18, 2)
   Status           String   @default("Active") @db.VarChar(20)
-  
-  // پاداش نهایی محاسبه شده
   Final_Bonus      Decimal? @db.Decimal(18, 2)
-  
   Manager_Score    Decimal? @db.Decimal(5, 2)
   Manager_Comment  String?  @db.VarChar(500)
   Manager_ID       Int?
   Created_By       Int?
   Created_At       DateTime @default(now())
   Updated_At       DateTime @updatedAt
-  
-  // روابط
+  PR_Project_Phases  PR_Project_Phases[] // <--- اضافه شود
   PR_Daily_Reports                            PR_Daily_Reports[]
   PR_Project_Assignments                      PR_Project_Assignments[]
   Personnel                                   Personnel?               @relation(fields: [Created_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Project_Creator")
   Personnel_PR_Projects_Manager_IDToPersonnel Personnel?               @relation("PR_Projects_Manager_IDToPersonnel", fields: [Manager_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Projects_Manager")
- Project_Leader Personnel? @relation("ProjectLeader", fields: [Project_Leader_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Project_Leader")
+  Project_Leader Personnel? @relation("ProjectLeader", fields: [Project_Leader_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Project_Leader")
 
   @@index([Created_By], map: "FK_Project_Creator")
   @@index([Manager_ID], map: "FK_PR_Projects_Manager")
@@ -474,35 +467,33 @@ model PR_Work_Types {
 
 model PR_Tasks {
   Task_ID     Int       @id @default(autoincrement())
-  Assigned_To Int // Personnel_ID
-  Assigned_By Int // Manager ID (User ID)
+  Assigned_To Int 
+  Assigned_By Int 
   Title       String    @db.VarChar(255)
   Description String?   @db.Text
+  Completion_Note  String?  @db.Text
   Due_Date    DateTime? @db.Date
-  Status      String    @default("Pending") @db.VarChar(20) // Pending, In_Progress, Done, Rejected
-  Priority    String    @default("Normal") @db.VarChar(20) // Low, Normal, High, Urgent
+  Status      String    @default("Pending") @db.VarChar(20)
+  Priority    String    @default("Normal") @db.VarChar(20)
   Created_At  DateTime  @default(now())
   Updated_At  DateTime  @updatedAt
 
-  // روابط
   Personnel_AssignedTo Personnel @relation("TaskAssignee", fields: [Assigned_To], references: [Personnel_ID])
+  // اصلاح ۳: رابطه صریح برای شخص تخصیص‌دهنده اضافه شد
+  Personnel_AssignedBy Personnel @relation("TaskAssigner", fields: [Assigned_By], references: [Personnel_ID])
 
   @@index([Assigned_To])
   @@index([Assigned_By])
 }
 
 model PR_Payroll_Settings {
-  Setting_ID                  Int      @id @default(1) // همیشه 1 است (تنظیمات کلی)
-  
-  // بخش ۱: نرخ‌های ساعتی
-  Base_Regular_Hourly_Rate    Decimal  @default(0) @db.Decimal(18, 2) // مبلغ پایه روز عادی
-  Holiday_Hour_Multiplier     Decimal  @default(0) @db.Decimal(5, 2)  // درصد اضافه کاری تعطیل
-  Friday_Hour_Multiplier      Decimal  @default(0) @db.Decimal(5, 2)  // درصد اضافه کاری جمعه
-  Mission_Regular_Multiplier  Decimal  @default(0) @db.Decimal(5, 2)  // درصد ماموریت روز عادی
-  Mission_Friday_Multiplier   Decimal  @default(0) @db.Decimal(5, 2)  // درصد ماموریت جمعه
-  Mission_Holiday_Multiplier  Decimal  @default(0) @db.Decimal(5, 2)  // درصد ماموریت تعطیل
-  
-  // بخش ۲: ساعات مجاز و اضافه کاری (هفته ۱ تا ۴)
+  Setting_ID                  Int      @id @default(1)
+  Base_Regular_Hourly_Rate    Decimal  @default(0) @db.Decimal(18, 2)
+  Holiday_Hour_Multiplier     Decimal  @default(0) @db.Decimal(5, 2)
+  Friday_Hour_Multiplier      Decimal  @default(0) @db.Decimal(5, 2)
+  Mission_Regular_Multiplier  Decimal  @default(0) @db.Decimal(5, 2)
+  Mission_Friday_Multiplier   Decimal  @default(0) @db.Decimal(5, 2)
+  Mission_Holiday_Multiplier  Decimal  @default(0) @db.Decimal(5, 2)
   Week1_Max_Hours             Decimal  @default(0) @db.Decimal(5, 2)
   Week1_Max_Overtime          Decimal  @default(0) @db.Decimal(5, 2)
   Week2_Max_Hours             Decimal  @default(0) @db.Decimal(5, 2)
@@ -511,16 +502,11 @@ model PR_Payroll_Settings {
   Week3_Max_Overtime          Decimal  @default(0) @db.Decimal(5, 2)
   Week4_Max_Hours             Decimal  @default(0) @db.Decimal(5, 2)
   Week4_Max_Overtime          Decimal  @default(0) @db.Decimal(5, 2)
-  
-  // روزهای آخر ماه
   MonthEnd_Max_Hours          Decimal  @default(0) @db.Decimal(5, 2)
   MonthEnd_Max_Overtime       Decimal  @default(0) @db.Decimal(5, 2)
   Delay_Penalty_Percent      Decimal? @default(0) @db.Decimal(5, 2) 
-  
-  // ساعات مجاز جمعه و تعطیل در ماه
   Max_Friday_Hours_Month      Decimal  @default(0) @db.Decimal(5, 2)
   Max_Holiday_Hours_Month     Decimal  @default(0) @db.Decimal(5, 2)
-  
   Updated_At                  DateTime @updatedAt
 }
 
@@ -560,6 +546,7 @@ model Personnel {
   PR_Project_Assignments                                            PR_Project_Assignments[]
   PR_Projects                                                       PR_Projects[]
   PR_Projects_PR_Projects_Manager_IDToPersonnel                     PR_Projects[]              @relation("PR_Projects_Manager_IDToPersonnel")
+  PR_Phase_Assignments                                              PR_Phase_Assignments[] // <--- 
   Production_Lines                                                  Production_Lines?          @relation(fields: [Line_ID], references: [Line_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Personnel_ProductionLines")
   Personnel_Hourly_Rates                                            Personnel_Hourly_Rates[]
   Supervisor_Machines                                               Supervisor_Machines[]
@@ -569,10 +556,8 @@ model Personnel {
   Work_Orders_Work_Orders_Requester_IDToPersonnel                   Work_Orders[]              @relation("Work_Orders_Requester_IDToPersonnel")
   Work_Orders_Work_Orders_Supervisor_IDToPersonnel                  Work_Orders[]              @relation("Work_Orders_Supervisor_IDToPersonnel")
   Work_Orders_Work_Orders_Technician_IDToPersonnel                  Work_Orders[]              @relation("Work_Orders_Technician_IDToPersonnel")
-  Work_Orders_Archive_Work_Orders_Archive_Requester_IDToPersonnel   Work_Orders_Archive[]      @relation("Work_Orders_Archive_Requester_IDToPersonnel")
-  Work_Orders_Archive_Work_Orders_Archive_Supervisor_IDToPersonnel  Work_Orders_Archive[]      @relation("Work_Orders_Archive_Supervisor_IDToPersonnel")
-  Work_Orders_Archive_Work_Orders_Archive_Technician_IDToPersonnel  Work_Orders_Archive[]      @relation("Work_Orders_Archive_Technician_IDToPersonnel")
   Tasks_AssignedTo                                                  PR_Tasks[]                 @relation("TaskAssignee")
+  Tasks_AssignedBy                                                  PR_Tasks[]                 @relation("TaskAssigner")
 
   Led_Projects PR_Projects[] @relation("ProjectLeader")
 
@@ -607,19 +592,18 @@ model Production_Lines {
 }
 
 model Repair_Types {
-  Repair_Type_ID      Int                   @id @default(autoincrement())
-  Repair_Type_Code    String                @unique(map: "Repair_Type_Code") @db.VarChar(20)
-  Repair_Type_Name    String                @db.VarChar(100)
-  Description         String?               @db.Text
-  Min_Price           Decimal               @db.Decimal(18, 2)
-  Max_Price           Decimal               @db.Decimal(18, 2)
+  Repair_Type_ID      Int           @id @default(autoincrement())
+  Repair_Type_Code    String        @unique(map: "Repair_Type_Code") @db.VarChar(20)
+  Repair_Type_Name    String        @db.VarChar(100)
+  Description         String?       @db.Text
+  Min_Price           Decimal       @db.Decimal(18, 2)
+  Max_Price           Decimal       @db.Decimal(18, 2)
   Difficulty_Level    Int
-  Estimated_Hours     Decimal?              @default(1.00) @db.Decimal(8, 2)
-  IsActive            Boolean?              @default(true)
-  Created_At          DateTime?             @default(now()) @db.DateTime(0)
+  Estimated_Hours     Decimal?      @default(1.00) @db.Decimal(8, 2)
+  IsActive            Boolean?      @default(true)
+  Created_At          DateTime?     @default(now()) @db.DateTime(0)
   WO_Repair_Types     WO_Repair_Types[]
   Work_Orders         Work_Orders[]
-  Work_Orders_Archive Work_Orders_Archive[]
 
   @@index([IsActive], map: "IX_Repair_Type_Active")
   @@index([Repair_Type_Code], map: "IX_Repair_Type_Code")
@@ -637,7 +621,6 @@ model Spare_Parts {
   IsActive              Boolean?                @default(true)
   Equipment_Spare_Parts Equipment_Spare_Parts[]
   WO_Spare_Used         WO_Spare_Used[]
-  WO_Spare_Used_Archive WO_Spare_Used_Archive[]
 }
 
 model Supervisor_Machines {
@@ -694,7 +677,11 @@ model Users {
   Created_At   DateTime?  @default(now()) @db.DateTime(0)
   Last_Login   DateTime?  @db.DateTime(0)
   Personnel    Personnel? @relation(fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Users_Personnel")
-  UserPageAccess UserPageAccess[] // <--- این خط را اضافه کنید
+  UserPageAccess UserPageAccess[] 
+    AnnouncementReads AnnouncementRead[]
+  // اصلاح ۴: روابط برای لاگ دسترسی‌ها اضافه شد
+  AccessLogs_Target AccessChangeLog[] @relation("AccessLogTarget")
+  AccessLogs_Actor  AccessChangeLog[] @relation("AccessLogActor")
 
   @@index([Personnel_ID], map: "Personnel_ID")
 }
@@ -756,22 +743,6 @@ model WO_Spare_Used {
   @@index([WO_ID], map: "IX_Spare_Used_WO")
 }
 
-model WO_Spare_Used_Archive {
-  WO_SU_ID      Int         @id
-  WO_ID         Int
-  Part_ID       Int
-  Quantity_Used Int
-  Unit_Price    Decimal     @db.Decimal(18, 2)
-  Total_Price   Decimal?    @db.Decimal(18, 2)
-  Used_At       DateTime?   @default(now()) @db.DateTime(0)
-  Archived_At   DateTime?   @default(now()) @db.DateTime(0)
-  Spare_Parts   Spare_Parts @relation(fields: [Part_ID], references: [Part_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOSUA_Part")
-  Work_Orders   Work_Orders @relation(fields: [WO_ID], references: [WO_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOSUA_WO")
-
-  @@index([Part_ID], map: "Part_ID")
-  @@index([WO_ID], map: "WO_ID")
-}
-
 model WO_Statuses {
   Status_Code     String                      @id @db.VarChar(30)
   Status_Name     String                      @db.VarChar(50)
@@ -791,6 +762,8 @@ model Work_Orders {
   Supervisor_ID                                  Int
   Technician_ID                                  Int?
   Contractor_ID                                  Int?
+  // اصلاح ۵: جدول بایگانی حذف شد و فیلد Is_Archived اضافه شد
+  Is_Archived                                    Boolean?                  @default(false)
   Status_Code                                    String                    @default("Awaiting approval") @db.VarChar(30)
   Rejection_Reason                               String?                   @db.Text
   Problem_Description                            String                    @db.Text
@@ -821,7 +794,6 @@ model Work_Orders {
   WO_Action_Log                                  WO_Action_Log[]
   WO_Repair_Types                                WO_Repair_Types[]
   WO_Spare_Used                                  WO_Spare_Used[]
-  WO_Spare_Used_Archive                          WO_Spare_Used_Archive[]
   Contractors                                    Contractors?              @relation(fields: [Contractor_ID], references: [Contractor_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Contractor")
   Equipment                                      Equipment?                @relation(fields: [Equipment_ID], references: [Equipment_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Equipment")
   Failure_Codes                                  Failure_Codes?            @relation(fields: [Failure_ID], references: [Failure_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WO_Failure")
@@ -847,67 +819,6 @@ model Work_Orders {
   @@index([Technician_ID], map: "Technician_ID")
 }
 
-model Work_Orders_Archive {
-  WO_ID                                                  Int                    @id
-  WO_Number                                              String                 @unique(map: "WO_Number") @db.VarChar(20)
-  Machine_ID                                             Int
-  Equipment_ID                                           Int?
-  Strategy_ID                                            Int
-  Failure_ID                                             Int?
-  Repair_Type_ID                                         Int?
-  Requester_ID                                           Int
-  Supervisor_ID                                          Int
-  Technician_ID                                          Int?
-  Contractor_ID                                          Int?
-  Status_Code                                            String                 @default("Awaiting approval") @db.VarChar(30)
-  Rejection_Reason                                       String?                @db.Text
-  Problem_Description                                    String                 @db.Text
-  Solution_Description                                   String?                @db.Text
-  Production_Feedback                                    String?                @db.Text
-  Request_Time                                           DateTime               @default(now()) @db.DateTime(0)
-  Assigned_Time                                          DateTime?              @db.DateTime(0)
-  Contractor_Response_Time                               DateTime?              @db.DateTime(0)
-  Breakdown_Start_Time                                   DateTime?              @db.DateTime(0)
-  Breakdown_End_Time                                     DateTime?              @db.DateTime(0)
-  Repair_Start_Time                                      DateTime?              @db.DateTime(0)
-  Repair_End_Time                                        DateTime?              @db.DateTime(0)
-  Machine_Restart_Time                                   DateTime?              @db.DateTime(0)
-  Due_Date                                               DateTime?              @db.DateTime(0)
-  Work_Difficulty                                        Int?                   @default(1)
-  Actual_Hours                                           Decimal?               @db.Decimal(8, 2)
-  Labor_Cost                                             Decimal?               @default(0.00) @db.Decimal(18, 2)
-  Spare_Cost                                             Decimal?               @default(0.00) @db.Decimal(18, 2)
-  Repair_Type_Cost                                       Decimal?               @default(0.00) @db.Decimal(18, 2)
-  Contractor_Cost                                        Decimal?               @default(0.00) @db.Decimal(18, 2)
-  Total_Cost                                             Decimal?               @default(0.00) @db.Decimal(18, 2)
-  Currency                                               String?                @default("IRR") @db.VarChar(10)
-  Is_First_Time_Fix                                      Boolean?
-  Is_Operator_Assisted                                   Boolean?               @default(false)
-  Created_At                                             DateTime?              @default(now()) @db.DateTime(0)
-  Updated_At                                             DateTime?              @default(now()) @db.DateTime(0)
-  Archived_At                                            DateTime?              @default(now()) @db.DateTime(0)
-  Contractors                                            Contractors?           @relation(fields: [Contractor_ID], references: [Contractor_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Contractor")
-  Equipment                                              Equipment?             @relation(fields: [Equipment_ID], references: [Equipment_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Equipment")
-  Failure_Codes                                          Failure_Codes?         @relation(fields: [Failure_ID], references: [Failure_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Failure")
-  Machines                                               Machines               @relation(fields: [Machine_ID], references: [Machine_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Machine")
-  Repair_Types                                           Repair_Types?          @relation(fields: [Repair_Type_ID], references: [Repair_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_RepairType")
-  Personnel_Work_Orders_Archive_Requester_IDToPersonnel  Personnel              @relation("Work_Orders_Archive_Requester_IDToPersonnel", fields: [Requester_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Requester")
-  Maintenance_Strategies                                 Maintenance_Strategies @relation(fields: [Strategy_ID], references: [Strategy_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Strategy")
-  Personnel_Work_Orders_Archive_Supervisor_IDToPersonnel Personnel              @relation("Work_Orders_Archive_Supervisor_IDToPersonnel", fields: [Supervisor_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Supervisor")
-  Personnel_Work_Orders_Archive_Technician_IDToPersonnel Personnel?             @relation("Work_Orders_Archive_Technician_IDToPersonnel", fields: [Technician_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WOA_Technician")
-
-  @@index([Contractor_ID], map: "Contractor_ID")
-  @@index([Equipment_ID], map: "Equipment_ID")
-  @@index([Failure_ID], map: "Failure_ID")
-  @@index([Machine_ID], map: "Machine_ID")
-  @@index([Repair_Type_ID], map: "Repair_Type_ID")
-  @@index([Requester_ID], map: "Requester_ID")
-  @@index([Status_Code], map: "Status_Code")
-  @@index([Strategy_ID], map: "Strategy_ID")
-  @@index([Supervisor_ID], map: "Supervisor_ID")
-  @@index([Technician_ID], map: "Technician_ID")
-}
-
 // ۱. جدول جایگاه‌های سازمانی
 model OrganizationalPosition {
   Position_ID Int         @id @default(autoincrement())
@@ -922,13 +833,87 @@ model Unit {
   Personnel  Personnel[]
 }
 
-
 model UserPageAccess {
   Access_ID Int    @id @default(autoincrement())
   User_ID   Int
   Route     String @db.VarChar(255)
   Users     Users  @relation(fields: [User_ID], references: [User_ID], onDelete: Cascade)
   @@unique([User_ID, Route])
+}
+
+// اصلاح ۴: مدل لاگ تغییرات دسترسی‌ها
+model AccessChangeLog {
+  Log_ID         Int      @id @default(autoincrement())
+  Target_User_ID Int
+  Actor_User_ID  Int
+  Action_Type    String   @db.VarChar(50) // "GRANT" or "REVOKE"
+  Route          String?  @db.VarChar(255)
+  Changed_At     DateTime @default(now())
+  Target_User    Users    @relation("AccessLogTarget", fields: [Target_User_ID], references: [User_ID])
+  Actor_User     Users    @relation("AccessLogActor", fields: [Actor_User_ID], references: [User_ID])
+
+  @@index([Target_User_ID], map: "IX_AccessLog_Target")
+  @@index([Actor_User_ID], map: "IX_AccessLog_Actor")
+}
+
+// مدل فازهای پروژه
+model PR_Project_Phases {
+  Phase_ID           Int       @id @default(autoincrement())
+  Project_ID         Int
+  Title              String    @db.VarChar(150)
+  Description        String?   @db.Text
+  Start_Date         DateTime  @db.Date
+  End_Date           DateTime  @db.Date
+  Status             String    @default("Pending") @db.VarChar(20) // Pending, In_Progress, Submitted, Approved, Rejected
+  Manager_Comment    String?   @db.VarChar(500)
+  Penalty_Amount     Decimal?  @default(0) @db.Decimal(18, 2) // جریمه دیرکرد این فاز
+  Extra_Days_Allowed Int?      @default(0) // روزهای اضافه تایید شده توسط مدیر
+  Submitted_At       DateTime? @db.DateTime(0)
+  Approved_At        DateTime? @db.DateTime(0)
+  Rejected_At        DateTime? @db.DateTime(0)
+
+  PR_Projects        PR_Projects @relation(fields: [Project_ID], references: [Project_ID], onDelete: Cascade)
+  PR_Phase_Assignments PR_Phase_Assignments[] // <--- 
+  
+  @@index([Project_ID])
+}
+
+// مدل تخصیص پرسنل به فازهای پروژه
+model PR_Phase_Assignments {
+  Assignment_ID Int      @id @default(autoincrement())
+  Phase_ID      Int
+  Personnel_ID  Int
+  Is_Leader     Boolean  @default(false) // مشخص کردن مسئول فاز
+
+  PR_Project_Phases PR_Project_Phases @relation(fields: [Phase_ID], references: [Phase_ID], onDelete: Cascade)
+  Personnel         Personnel         @relation(fields: [Personnel_ID], references: [Personnel_ID])
+
+  @@unique([Phase_ID, Personnel_ID]) // جلوگیری از تکرار یک فرد در یک فاز
+  @@index([Phase_ID])
+  @@index([Personnel_ID])
+}
+
+// مدل اطلاعیه‌ها
+model Announcement {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(255)
+  content   String   @db.Text
+  fileUrl   String?  @db.VarChar(500)
+  fileType  String?  @db.VarChar(50)
+  createdAt DateTime @default(now())
+  reads     AnnouncementRead[]
+}
+
+// مدل ردیابی خوانده شدن اطلاعیه توسط کاربر
+model AnnouncementRead {
+  id              Int           @id @default(autoincrement())
+  userId          Int
+  announcementId  Int
+  readAt          DateTime      @default(now())
+  user            Users         @relation(fields: [userId], references: [User_ID])
+  announcement    Announcement  @relation(fields: [announcementId], references: [id])
+
+  @@unique([userId, announcementId])
 }
 
 enum PR_Monthly_Salary_Details_Detail_Type {

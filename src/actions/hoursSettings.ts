@@ -21,7 +21,7 @@ export async function getPersonnelForHours() {
   });
 
   // برای ساده‌سازی کدهای فرانت‌اند، نام رابطه طولانی را به PR_Personnel_Finance تبدیل می‌کنیم
-  const mappedPersonnel = personnelData.map(p => ({
+  const mappedPersonnel = personnelData.map((p: any) => ({
     ...p,
     PR_Personnel_Finance: p.PR_Personnel_Finance_PR_Personnel_Finance_Personnel_IDToPersonnel
   }));

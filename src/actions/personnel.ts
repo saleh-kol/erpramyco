@@ -4,15 +4,15 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers"; // <--- این خط اضافه شود
-import { verifySession } from "@/lib/session"; // <--- این خط اضافه شود
+import { cookies } from "next/headers";
+import { verifySession } from "@/lib/session";
 
 // ۱. گرفتن لیست همه پرسنل برای نمایش در کارت‌ها
 export async function getPersonnel() {
   const personnel = await prisma.personnel.findMany({
     include: {
-      OrganizationalPosition: true, // جایگاه سازمانی
-      Unit: true,                    // واحد سازمانی
+      OrganizationalPosition: true,
+      Unit: true,
       Personnel_Hourly_Rates: {
         where: { Is_Active: true },
         orderBy: { Effective_From: "desc" },
@@ -35,7 +35,6 @@ export async function createPersonnelAction(formData: FormData) {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
 
-  // --- بررسی اینکه آیا کاربر فعلی مدیرعامل است یا خیر ---
   const cookieStore = await cookies();
   const session = cookieStore.get("session")?.value;
   const currentUser = session ? await verifySession(session) : null;
@@ -43,7 +42,7 @@ export async function createPersonnelAction(formData: FormData) {
   const isCEO = dbUser?.Personnel?.Role === 'CEO';
 
   try {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       const newPersonnel = await tx.personnel.create({
         data: {
           Full_Name: fullName,
@@ -52,8 +51,8 @@ export async function createPersonnelAction(formData: FormData) {
           Position_ID: positionId ? parseInt(positionId) : null,
           Unit_ID: unitId ? parseInt(unitId) : null,
           Employment_Type: employmentType as any,
-          IsActive: isCEO ? true : false, // اگر مدیرعامل نبود، یوزر فعال نیست تا تایید شود
-          IsApproved: isCEO ? true : false, // اگر مدیرعامل نبود، نیاز به تایید دارد
+          IsActive: isCEO ? true : false,
+          IsApproved: isCEO ? true : false,
         },
       });
 
@@ -83,7 +82,6 @@ export async function approvePersonnelAction(formData: FormData) {
   const personnelId = parseInt(formData.get("personnelId") as string);
   const action = formData.get("action") as string; // "approve" or "reject"
 
-  // --- بررسی دسترسی: فقط مدیرعامل می‌تواند تایید کند ---
   const cookieStore = await cookies();
   const session = cookieStore.get("session")?.value;
   const currentUser = session ? await verifySession(session) : null;
@@ -98,7 +96,6 @@ export async function approvePersonnelAction(formData: FormData) {
   if (dbUser?.Personnel?.Role !== 'CEO') {
     return { error: "شما دسترسی به این عملیات ندارید. فقط مدیرعامل می‌تواند تایید کند." };
   }
-  // ----------------------------------------------------
 
   try {
     if (action === "approve") {
@@ -121,10 +118,8 @@ export async function approvePersonnelAction(formData: FormData) {
   revalidatePath("/dashboard/personnel");
   redirect("/dashboard/personnel");
 }
-
-// ۳. گرفتن اطلاعات یک پرسنل برای ویرایش
+// ۴. گرفتن اطلاعات یک پرسنل برای ویرایش
 export async function getPersonnelForEdit(id: string) {
-  // بررسی اینکه آیا id به درستی ارسال شده است یا خیر
   const personnelId = parseInt(id);
   if (isNaN(personnelId)) {
     throw new Error("شناسه پرسنل برای ویرایش نامعتبر است");
@@ -135,12 +130,12 @@ export async function getPersonnelForEdit(id: string) {
     include: {
       OrganizationalPosition: true,
       Unit: true,
+      Users: true, // <--- این خط اضافه شود تا یوزرنیم خوانده شود
     }
   });
   return JSON.parse(JSON.stringify(personnel));
 }
-
-// ۴. اکشن ویرایش اطلاعات پرسنل
+// ۵. اکشن ویرایش اطلاعات پرسنل
 export async function updatePersonnelAction(formData: FormData) {
   const personnelId = parseInt(formData.get("personnelId") as string);
   const fullName = formData.get("fullName") as string;
@@ -149,6 +144,9 @@ export async function updatePersonnelAction(formData: FormData) {
   const unitId = formData.get("unitId") as string;
   const employmentType = formData.get("employmentType") as string;
   const isActive = formData.get("isActive") === "true";
+  
+  // گرفتن مسیر عکس از فرم
+  const imagePath = formData.get("imagePath") as string;
 
   try {
     await prisma.personnel.update({
@@ -160,6 +158,7 @@ export async function updatePersonnelAction(formData: FormData) {
         Unit_ID: unitId ? parseInt(unitId) : null,
         Employment_Type: employmentType as any,
         IsActive: isActive,
+        Personal_Image_Path: imagePath || null, // <--- ذخیره مسیر عکس در دیتابیس
       },
     });
   } catch (error: any) {

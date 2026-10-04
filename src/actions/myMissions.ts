@@ -38,7 +38,7 @@ export async function getMyMissions(status: string = 'pending') {
   return JSON.parse(JSON.stringify(missions));
 }
 
-// ۲. ثبت درخواست ماموریت جدید
+// ۲. ثبت درخواست ماموریت جدید توسط کارمند (در وضعیت Pending)
 export async function createMyMissionAction(formData: FormData) {
   const user = await getSession();
   if (!user) return { error: "نشست نامعتبر است" };
@@ -52,6 +52,7 @@ export async function createMyMissionAction(formData: FormData) {
   const destination = formData.get('destination') as string;
   const distanceKm = parseFloat(formData.get('distanceKm') as string);
   const amount = parseFloat(formData.get('amount') as string);
+  const commuteDuration = formData.get('commuteDuration') as string;
   const receiptNumber = formData.get('receiptNumber') as string;
   const description = formData.get('description') as string;
 
@@ -65,8 +66,10 @@ export async function createMyMissionAction(formData: FormData) {
         Destination: destination,
         Distance_KM: distanceKm || 0,
         Amount: amount || 0,
+        Commute_Duration: commuteDuration ? parseFloat(commuteDuration) : null,
         Receipt_Number: receiptNumber,
         Description: description,
+        // کارمند ثبت می‌کند → در انتظار تایید مدیر
         Is_Approved: false,
         Status: 'Pending'
       }
@@ -78,7 +81,7 @@ export async function createMyMissionAction(formData: FormData) {
   }
 }
 
-// ۳. اتمام ماموریت توسط کارمند
+// ۳. اتمام ماموریت توسط کارمند (از InProgress به Completed)
 export async function completeMyMissionAction(formData: FormData) {
   const commuteId = parseInt(formData.get('commuteId') as string);
 
@@ -88,9 +91,10 @@ export async function completeMyMissionAction(formData: FormData) {
   });
 
   revalidatePath('/dashboard/my-missions');
+  return { success: true };
 }
 
-// ۴. تایید یا رد درخواست ماموریت توسط مدیر
+// ۴. تایید یا رد درخواست ماموریت توسط مدیر (از صفحه درخواست‌ها)
 export async function reviewMissionRequestAction(formData: FormData) {
   const commuteId = parseInt(formData.get('commuteId') as string);
   const action = formData.get('action') as string;
@@ -98,14 +102,15 @@ export async function reviewMissionRequestAction(formData: FormData) {
   const user = await getSession();
   if (!user) return { error: "نشست نامعتبر است" };
 
+  // تایید درخواست → InProgress (شروع ماموریت)
+  // رد درخواست → Rejected
   const newStatus = action === 'approve' ? 'InProgress' : 'Rejected';
-  const isApproved = action === 'approve';
 
   await prisma.pR_Commute_Logs.update({
     where: { Commute_ID: commuteId },
     data: {
       Status: newStatus,
-      Is_Approved: isApproved,
+      // Is_Approved نباید اینجا true شود. این فیلد فقط برای ارزیابی نهایی است.
       Approved_At: new Date(),
       Approved_By: user.userId
     }
@@ -115,7 +120,6 @@ export async function reviewMissionRequestAction(formData: FormData) {
   revalidatePath('/dashboard/my-missions');
   return { success: true };
 }
-
 // ۵. گرفتن درخواست‌های ماموریت برای مدیر
 export async function getPendingMissions() {
   const missions = await prisma.pR_Commute_Logs.findMany({
@@ -124,7 +128,7 @@ export async function getPendingMissions() {
     orderBy: { Commute_Date: 'desc' }
   });
   
-  const mappedMissions = missions.map(m => ({
+  const mappedMissions = missions.map((m: any) => ({
     ...m,
     Personnel: m.Personnel_PR_Commute_Logs_Personnel_IDToPersonnel
   }));
