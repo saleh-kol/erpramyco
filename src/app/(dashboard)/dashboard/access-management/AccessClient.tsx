@@ -34,6 +34,10 @@ const routeTranslations: Record<string, string> = {
   "/dashboard/roles": "تعریف نقش‌ها",
   "/dashboard/access-management": "مدیریت دسترسی پرسنل",
   "/dashboard/announcements": "صدور اطلاعیه",
+  "/dashboard/my-agenda": "برنامه‌ریزی من",
+  "/dashboard/payslips": "فیش حقوقی من",
+  "/dashboard/payroll": "فیش‌های حقوقی",
+  "/dashboard/payroll-approval": "تایید فیش حقوقی",
 };
 
 export default function AccessClient({

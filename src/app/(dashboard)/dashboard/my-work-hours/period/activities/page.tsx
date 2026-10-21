@@ -1,11 +1,13 @@
-import { getMyPeriodDetails } from "@/actions/workHours"; // مسیر فایل اکشن خود را چک کنید
+import { getMyPeriodDetails } from "@/actions/workHours";
 import ActivitiesClient from "./ActivitiesClient";
+import { PERIOD_KEYS } from "@/lib/periods";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-export default async function ActivitiesPage({ searchParams }: { searchParams: { period?: string } }) {
-  const period = searchParams.period || 'week1';
+export default async function ActivitiesPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  const { period: periodParam } = await searchParams; 
+  const period = periodParam && (PERIOD_KEYS as readonly string[]).includes(periodParam) ? periodParam : "week1";
+
   const data = await getMyPeriodDetails(period);
-  
   return <ActivitiesClient data={data} period={period} />;
 }

@@ -21,6 +21,7 @@ import {
   Crown,
   FileCheck,
   FileText,
+  AlertCircle,
 } from "lucide-react";
 
 const toPersianDate = (date: Date | string) => {
@@ -43,53 +44,60 @@ export default function LeaveApprovalsClient({
 }) {
   const router = useRouter();
 
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedLeave, setSelectedLeave] = useState<any>(null); // استیت برای پاپ‌آپ مرخصی
+  const [selectedLeave, setSelectedLeave] = useState<any>(null);
 
-  const [activeTab, setActiveTab] = useState<
-    "leaves" | "projects" | "missions"
-  >("leaves");
+  const [activeTab, setActiveTab] = useState<"leaves" | "projects" | "missions">("leaves");
 
   const handleStatusChange = (status: string) => {
-    router.push(
-      `/dashboard/leave-approvals?status=${encodeURIComponent(status)}`,
-    );
+    router.push(`/dashboard/leave-approvals?status=${encodeURIComponent(status)}`);
   };
 
-  const showToast = (message: string, duration = 3000) => {
-    setToast(message);
-    setTimeout(() => {
-      setToast(null);
-    }, duration);
+  // ✅ Toast دوحالته
+  const showToast = (message: string, type: "success" | "error" = "success", duration = 3500) => {
+    setToast({ msg: message, type });
+    setTimeout(() => setToast(null), duration);
   };
 
+  // ✅ فیکس: هندل خطای سرور (گارد سرپرست مستقیم) + رفرش
   const handleLeaveAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const result = await reviewLeaveRequestAction(formData);
-    if (result?.success) {
-      showToast("وضعیت درخواست مرخصی تغییر کرد");
-      setSelectedLeave(null); // بستن مودال پس از اقدام
+    const result: any = await reviewLeaveRequestAction(formData);
+    if (result?.error) {
+      showToast(`خطا: ${result.error}`, "error", 5000);
+      return;
     }
+    showToast("وضعیت درخواست مرخصی تغییر کرد");
+    setSelectedLeave(null);
+    router.refresh();
   };
 
+  // ✅ فیکس: هندل خطا + رفرش (پروژه از لیست محو شود)
   const handleProjectAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const result: any = await reviewProjectCompletionAction(formData);
-    if (result?.success) {
-      showToast(result?.message || "وضعیت درخواست پروژه تغییر کرد", 4000);
+    if (result?.error) {
+      showToast(`خطا: ${result.error}`, "error", 5000);
+      return;
     }
+    showToast(result?.message || "وضعیت درخواست پروژه تغییر کرد", "success", 4500);
+    router.refresh();
   };
 
+  // ✅ فیکس: هندل خطا + رفرش
   const handleMissionAction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const result: any = await reviewMissionRequestAction(formData);
-    if (result?.success) {
-      showToast("وضعیت درخواست مأموریت تغییر کرد");
+    if (result?.error) {
+      showToast(`خطا: ${result.error}`, "error", 5000);
+      return;
     }
+    showToast("وضعیت درخواست مأموریت تغییر کرد");
+    router.refresh();
   };
 
   const getStatusConfig = (status: string) => {
@@ -103,7 +111,7 @@ export default function LeaveApprovalsClient({
 
     if (status === "Rejected" || status === "Active") {
       return {
-        label: "رد شده",
+        label: status === "Active" ? "بازگشت داده شده" : "رد شده",
         className: "border border-red-200 bg-red-50 text-red-700",
         icon: XCircle,
       };
@@ -129,9 +137,8 @@ export default function LeaveApprovalsClient({
     const search = searchTerm.toLowerCase();
     return (
       p.Project_Name?.toLowerCase().includes(search) ||
-      p.PR_Project_Assignments?.[0]?.Personnel?.Full_Name?.toLowerCase().includes(
-        search,
-      )
+      // ✅ فیکس: جستجو بر اساس مسئول پروژه — نه اولین عضو
+      p.Project_Leader?.Full_Name?.toLowerCase().includes(search)
     );
   });
 
@@ -166,7 +173,7 @@ export default function LeaveApprovalsClient({
                   مدیریت درخواست‌ها
                 </h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  بررسی و مدیریت درخواست‌های کارکنان
+                  بررسی درخواست‌های زیرمجموعه‌های مستقیم شما
                 </p>
               </div>
             </div>
@@ -437,8 +444,8 @@ export default function LeaveApprovalsClient({
                     const status = getStatusConfig(r.Status);
                     const StatusIcon = status.icon;
                     return (
-                      <div 
-                        key={r.Leave_ID} 
+                      <div
+                        key={r.Leave_ID}
                         className="space-y-4 p-5 cursor-pointer hover:bg-slate-50"
                         onClick={() => setSelectedLeave(r)}
                       >
@@ -680,11 +687,11 @@ export default function LeaveApprovalsClient({
 
       {/* LEAVE DETAILS MODAL */}
       {selectedLeave && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onClick={() => setSelectedLeave(null)}
         >
-          <div 
+          <div
             className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -773,13 +780,23 @@ export default function LeaveApprovalsClient({
         </div>
       )}
 
-      {/* TOAST */}
+      {/* TOAST — ✅ دوحالته: موفقیت سبز / خطا قرمز */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-xl border border-emerald-200 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 shadow-xl">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50">
-            <CheckCircle className="h-4 w-4 text-emerald-500" />
+        <div
+          className={`fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-3 rounded-xl border px-5 py-3.5 text-sm font-semibold shadow-xl ${
+            toast.type === "error"
+              ? "border-red-200 bg-white text-red-700"
+              : "border-emerald-200 bg-white text-slate-700"
+          }`}
+        >
+          <div className={`flex h-7 w-7 items-center justify-center rounded-full ${toast.type === "error" ? "bg-red-50" : "bg-emerald-50"}`}>
+            {toast.type === "error" ? (
+              <AlertCircle className="h-4 w-4 text-red-500" />
+            ) : (
+              <CheckCircle className="h-4 w-4 text-emerald-500" />
+            )}
           </div>
-          {toast}
+          {toast.msg}
         </div>
       )}
     </div>
@@ -787,7 +804,7 @@ export default function LeaveApprovalsClient({
 }
 
 /* ============================================================
-   REUSABLE SECTION HEADER
+   REUSABLE SECTION HEADER — دست نخورده
 ============================================================ */
 function SectionHeader({
   icon,
@@ -814,7 +831,7 @@ function SectionHeader({
 }
 
 /* ============================================================
-   EMPTY STATE
+   EMPTY STATE — دست نخورده
 ============================================================ */
 function EmptyState() {
   return (

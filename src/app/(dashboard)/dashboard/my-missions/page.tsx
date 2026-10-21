@@ -1,13 +1,11 @@
-import { getMyMissions } from '@/actions/myMissions'
-import MyMissionsClient from './MyMissionsClient'
+// my-missions/page.tsx
+import { getMyMissions } from "@/actions/myMissions";
+import MyMissionsClient from "./MyMissionsClient";
+import { MY_MISSION_VALID_STATUSES } from "@/lib/mission/constants";
 
 export default async function MyMissionsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status: statusParam } = await searchParams;
-  
-  // لیست وضعیت‌های جدید
-  const validStatuses = ['pending', 'inprogress', 'completed', 'rejected'];
-  const status: string = (statusParam && validStatuses.includes(statusParam)) ? statusParam : 'pending';
-
-  const missions = await getMyMissions(status as any);
-  return <MyMissionsClient missions={missions} currentStatus={status} />
+  const status = statusParam && MY_MISSION_VALID_STATUSES.includes(statusParam) ? statusParam : "pending";
+  const missions = await getMyMissions(status);
+  return <MyMissionsClient missions={missions} currentStatus={status} />;
 }

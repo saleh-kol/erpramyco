@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Users, Settings, Cog, Navigation, Clock, Calendar, 
-  ClipboardCheck, Bell, ChevronDown, UserCircle2, Menu, Briefcase, Wallet, ShieldCheck, Megaphone
+  ClipboardCheck, Bell, ChevronDown, UserCircle2, Menu, Briefcase, Wallet, ShieldCheck, Megaphone, CalendarDays, Network, FileText,
+  FileCheck2, ReceiptText
 } from "lucide-react";
 
 // لیست صفحاتی که فقط مدیرعامل باید ببیند
@@ -13,8 +14,9 @@ const CEO_ALLOWED_ROUTES = [
   "/dashboard", "/dashboard/profile", "/dashboard/projects", "/dashboard/missions",
   "/dashboard/tasks", "/dashboard/personnel", "/dashboard/leave-approvals",
   "/dashboard/activity-settings", "/dashboard/hours-settings",
-  "/dashboard/roles", "/dashboard/access-management", "/dashboard/announcements"
-];
+  "/dashboard/roles", "/dashboard/access-management", "/dashboard/announcements", "/dashboard/my-agenda", "/dashboard/supervision-settings", "/dashboard/payroll-settings",
+  "/dashboard/attendance", "/dashboard/payroll-approval"
+]
 
 type MenuItem = {
   title: string;
@@ -26,6 +28,7 @@ type MenuItem = {
 const menuItems: MenuItem[] = [
   { title: "داشبورد", href: "/dashboard", icon: LayoutDashboard },
   { title: "پروفایل من", href: "/dashboard/profile", icon: UserCircle2 },
+  { title: "تنظیمات سرپرستی", href: "/dashboard/supervision-settings", icon: Network },
   { title: "مدیریت پروژه‌ها", href: "/dashboard/projects", icon: Briefcase },
   { title: "مدیریت ماموریت‌ها", href: "/dashboard/missions", icon: Navigation },
   { title: "صدور ابلاغیه", href: "/dashboard/tasks", icon: Bell },
@@ -33,6 +36,8 @@ const menuItems: MenuItem[] = [
   { title: "پرسنل", href: "/dashboard/personnel", icon: Users },
   { title: "درخواست کارکنان", href: "/dashboard/leave-approvals", icon: ClipboardCheck },
   { title: "تنظیمات حقوق و دستمزد", href: "/dashboard/payroll-settings", icon: Wallet },
+  { title: "فیش‌های حقوقی", href: "/dashboard/payroll", icon: FileText },
+  { title: "تایید فیش حقوقی", href: "/dashboard/payroll-approval", icon: FileCheck2 },
   
   // منوهای مخصوص کاربران عادی
   { title: "ثبت فعالیت", href: "/dashboard/attendance", icon: Clock },
@@ -41,7 +46,9 @@ const menuItems: MenuItem[] = [
   { title: "ماموریت‌های من", href: "/dashboard/my-missions", icon: Navigation },
   { title: "ابلاغیه‌های من", href: "/dashboard/my-tasks", icon: Bell },
   { title: "تقویم کاری", href: "/dashboard/calendar", icon: Calendar },
+  { title: "برنامه‌ریزی من", href: "/dashboard/my-agenda", icon: CalendarDays },
   { title: "گزارش کارکرد من", href: "/dashboard/my-work-hours", icon: Clock },
+  { title: "فیش حقوقی من", href: "/dashboard/payslips", icon: ReceiptText },
 
   // منوی کشویی تنظیمات (شامل مدیریت دسترسی)
   {

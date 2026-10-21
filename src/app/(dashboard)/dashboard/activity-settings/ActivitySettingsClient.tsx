@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   addWorkTypeAction,
   deleteWorkTypeAction,
   addLocationAction,
   deleteLocationAction,
+  updateWorkTypeAction,
+  updateLocationAction,
 } from "@/actions/activitySettings";
 
 import {
@@ -15,6 +18,10 @@ import {
   Briefcase,
   MapPin,
   CheckCircle,
+  Pencil,
+  X,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 
 export default function ActivitySettingsClient({
@@ -24,14 +31,130 @@ export default function ActivitySettingsClient({
   types: any[];
   locations: any[];
 }) {
-  const [toast, setToast] = useState<string | null>(null);
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
-  const showToast = (message: string) => {
-    setToast(message);
+  const [typeInput, setTypeInput] = useState("");
+  const [locationInput, setLocationInput] = useState("");
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
-    setTimeout(() => {
-      setToast(null);
-    }, 3000);
+  // ✅ ویرایش درجالین
+  const [editingTypeId, setEditingTypeId] = useState<number | null>(null);
+  const [editTypeName, setEditTypeName] = useState("");
+  const [editingLocationId, setEditingLocationId] = useState<number | null>(null);
+  const [editLocationName, setEditLocationName] = useState("");
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  // ---------- انواع فعالیت ----------
+  const handleAddType = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.append("name", typeInput);
+
+    startTransition(async () => {
+      const res: any = await addWorkTypeAction(fd);
+      if (res?.error) {
+        showToast(res.error, "error");
+      } else {
+        setTypeInput("");
+        showToast("نوع فعالیت اضافه شد");
+        router.refresh();
+      }
+    });
+  };
+
+  const handleUpdateType = () => {
+    if (!editTypeName.trim()) {
+      showToast("نام نمی‌تواند خالی باشد", "error");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("id", String(editingTypeId));
+    fd.append("name", editTypeName);
+
+    startTransition(async () => {
+      const res: any = await updateWorkTypeAction(fd);
+      if (res?.error) {
+        showToast(res.error, "error");
+      } else {
+        setEditingTypeId(null);
+        showToast("نوع فعالیت ویرایش شد");
+        router.refresh();
+      }
+    });
+  };
+
+  const handleDeleteType = (id: number) => {
+    const fd = new FormData();
+    fd.append("id", String(id));
+
+    startTransition(async () => {
+      const res: any = await deleteWorkTypeAction(fd);
+      if (res?.error) {
+        showToast(res.error, "error");
+      } else {
+        showToast("نوع فعالیت حذف شد");
+        router.refresh();
+      }
+    });
+  };
+
+  // ---------- محل‌های فعالیت ----------
+  const handleAddLocation = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.append("name", locationInput);
+
+    startTransition(async () => {
+      const res: any = await addLocationAction(fd);
+      if (res?.error) {
+        showToast(res.error, "error");
+      } else {
+        setLocationInput("");
+        showToast("محل فعالیت اضافه شد");
+        router.refresh();
+      }
+    });
+  };
+
+  const handleUpdateLocation = () => {
+    if (!editLocationName.trim()) {
+      showToast("نام نمی‌تواند خالی باشد", "error");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("id", String(editingLocationId));
+    fd.append("name", editLocationName);
+
+    startTransition(async () => {
+      const res: any = await updateLocationAction(fd);
+      if (res?.error) {
+        showToast(res.error, "error");
+      } else {
+        setEditingLocationId(null);
+        showToast("محل فعالیت ویرایش شد");
+        router.refresh();
+      }
+    });
+  };
+
+  const handleDeleteLocation = (id: number) => {
+    const fd = new FormData();
+    fd.append("id", String(id));
+
+    startTransition(async () => {
+      const res: any = await deleteLocationAction(fd);
+      if (res?.error) {
+        showToast(res.error, "error");
+      } else {
+        showToast("محل فعالیت حذف شد");
+        router.refresh();
+      }
+    });
   };
 
   return (
@@ -86,23 +209,22 @@ export default function ActivitySettingsClient({
             <div className="p-5 sm:p-6">
 
               {/* Add */}
-              <form
-                action={addWorkTypeAction}
-                onSubmit={() => showToast("نوع فعالیت اضافه شد")}
-                className="mb-5 flex gap-2"
-              >
+              <form onSubmit={handleAddType} className="mb-5 flex gap-2">
                 <input
                   name="name"
                   required
                   type="text"
                   placeholder="نام نوع فعالیت جدید..."
+                  value={typeInput}
+                  onChange={(e) => setTypeInput(e.target.value)}
                   className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-[#ed6e2b] focus:bg-white focus:ring-4 focus:ring-orange-100"
                 />
 
                 <button
                   type="submit"
+                  disabled={isPending}
                   aria-label="افزودن نوع فعالیت"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ed6e2b] text-white shadow-sm shadow-orange-200 transition-all hover:bg-[#d95f20] hover:shadow-md active:scale-95"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ed6e2b] text-white shadow-sm shadow-orange-200 transition-all hover:bg-[#d95f20] hover:shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-wait"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -116,34 +238,73 @@ export default function ActivitySettingsClient({
                       key={type.Work_Type_ID}
                       className="group flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition-all hover:border-orange-100 hover:bg-orange-50/40"
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white">
-                          <Briefcase className="h-4 w-4 text-slate-400 transition-colors group-hover:text-[#ed6e2b]" />
+                      {editingTypeId === type.Work_Type_ID ? (
+                        // ✅ حالت ویرایش
+                        <div className="flex w-full items-center gap-2">
+                          <input
+                            autoFocus
+                            value={editTypeName}
+                            onChange={(e) => setEditTypeName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleUpdateType();
+                              if (e.key === "Escape") setEditingTypeId(null);
+                            }}
+                            className="min-w-0 flex-1 rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#ed6e2b]"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleUpdateType}
+                            disabled={isPending}
+                            title="ذخیره"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600 transition hover:bg-green-100 disabled:opacity-50"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingTypeId(null)}
+                            title="انصراف"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
                         </div>
+                      ) : (
+                        // حالت نمایش
+                        <>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white">
+                              <Briefcase className="h-4 w-4 text-slate-400 transition-colors group-hover:text-[#ed6e2b]" />
+                            </div>
 
-                        <span className="truncate text-sm font-semibold text-slate-700">
-                          {type.Work_Type_Name}
-                        </span>
-                      </div>
+                            <span className="truncate text-sm font-semibold text-slate-700">
+                              {type.Work_Type_Name}
+                            </span>
+                          </div>
 
-                      <form
-                        action={deleteWorkTypeAction}
-                        onSubmit={() => showToast("نوع فعالیت حذف شد")}
-                      >
-                        <input
-                          type="hidden"
-                          name="id"
-                          value={type.Work_Type_ID}
-                        />
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => { setEditingTypeId(type.Work_Type_ID); setEditTypeName(type.Work_Type_Name); }}
+                              disabled={isPending}
+                              aria-label={`ویرایش ${type.Work_Type_Name}`}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-orange-50 hover:text-[#ed6e2b] disabled:opacity-50"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
 
-                        <button
-                          type="submit"
-                          aria-label={`حذف ${type.Work_Type_Name}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </form>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteType(type.Work_Type_ID)}
+                              disabled={isPending}
+                              aria-label={`حذف ${type.Work_Type_Name}`}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))
                 ) : (
@@ -183,23 +344,22 @@ export default function ActivitySettingsClient({
             <div className="p-5 sm:p-6">
 
               {/* Add */}
-              <form
-                action={addLocationAction}
-                onSubmit={() => showToast("محل فعالیت اضافه شد")}
-                className="mb-5 flex gap-2"
-              >
+              <form onSubmit={handleAddLocation} className="mb-5 flex gap-2">
                 <input
                   name="name"
                   required
                   type="text"
                   placeholder="نام محل فعالیت جدید..."
+                  value={locationInput}
+                  onChange={(e) => setLocationInput(e.target.value)}
                   className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-[#ed6e2b] focus:bg-white focus:ring-4 focus:ring-orange-100"
                 />
 
                 <button
                   type="submit"
+                  disabled={isPending}
                   aria-label="افزودن محل فعالیت"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ed6e2b] text-white shadow-sm shadow-orange-200 transition-all hover:bg-[#d95f20] hover:shadow-md active:scale-95"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ed6e2b] text-white shadow-sm shadow-orange-200 transition-all hover:bg-[#d95f20] hover:shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-wait"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -213,34 +373,73 @@ export default function ActivitySettingsClient({
                       key={location.Location_ID}
                       className="group flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition-all hover:border-orange-100 hover:bg-orange-50/40"
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white">
-                          <MapPin className="h-4 w-4 text-slate-400 transition-colors group-hover:text-[#ed6e2b]" />
+                      {editingLocationId === location.Location_ID ? (
+                        // ✅ حالت ویرایش
+                        <div className="flex w-full items-center gap-2">
+                          <input
+                            autoFocus
+                            value={editLocationName}
+                            onChange={(e) => setEditLocationName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleUpdateLocation();
+                              if (e.key === "Escape") setEditingLocationId(null);
+                            }}
+                            className="min-w-0 flex-1 rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-[#ed6e2b]"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleUpdateLocation}
+                            disabled={isPending}
+                            title="ذخیره"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50 text-green-600 transition hover:bg-green-100 disabled:opacity-50"
+                          >
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingLocationId(null)}
+                            title="انصراف"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
                         </div>
+                      ) : (
+                        // حالت نمایش
+                        <>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white">
+                              <MapPin className="h-4 w-4 text-slate-400 transition-colors group-hover:text-[#ed6e2b]" />
+                            </div>
 
-                        <span className="truncate text-sm font-semibold text-slate-700">
-                          {location.Location_Name}
-                        </span>
-                      </div>
+                            <span className="truncate text-sm font-semibold text-slate-700">
+                              {location.Location_Name}
+                            </span>
+                          </div>
 
-                      <form
-                        action={deleteLocationAction}
-                        onSubmit={() => showToast("محل فعالیت حذف شد")}
-                      >
-                        <input
-                          type="hidden"
-                          name="id"
-                          value={location.Location_ID}
-                        />
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => { setEditingLocationId(location.Location_ID); setEditLocationName(location.Location_Name); }}
+                              disabled={isPending}
+                              aria-label={`ویرایش ${location.Location_Name}`}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-orange-50 hover:text-[#ed6e2b] disabled:opacity-50"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
 
-                        <button
-                          type="submit"
-                          aria-label={`حذف ${location.Location_Name}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </form>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLocation(location.Location_ID)}
+                              disabled={isPending}
+                              aria-label={`حذف ${location.Location_Name}`}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-all hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))
                 ) : (
@@ -261,8 +460,12 @@ export default function ActivitySettingsClient({
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl">
-          <CheckCircle className="h-5 w-5 text-emerald-400" />
-          {toast}
+          {toast.type === "error" ? (
+            <AlertCircle className="h-5 w-5 text-red-400" />
+          ) : (
+            <CheckCircle className="h-5 w-5 text-emerald-400" />
+          )}
+          {toast.msg}
         </div>
       )}
     </div>

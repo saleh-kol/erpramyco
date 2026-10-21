@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createProjectAction } from "@/actions/projects";
 import {
-  Search, Plus, Briefcase, X, Save, CheckCircle, UserCircle2, Users, Check, Award, Calendar, Crown, Layers, Trash2, AlertTriangle
+  Search, Plus, Briefcase, X, Save, CheckCircle, UserCircle2, Users, Check, Award, Calendar, Crown, Layers, Trash2, AlertTriangle, Info
 } from "lucide-react";
 
 import DatePicker from "react-multi-date-picker";
@@ -31,14 +31,32 @@ const formatToLocalISO = (dateObj: any) => {
   } catch (e) { return ""; }
 };
 
-export default function ProjectsClient({ projects, personnel, currentStatus }: { projects: any[], personnel: any[], currentStatus: string }) {
+// ============================================================
+//  ✅ جداکننده سه‌رقمی مبالغ
+// ============================================================
+const stripSeparators = (s: string): string => {
+  return s
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[^\d]/g, "")
+    .slice(0, 15);
+};
+
+const formatWithSeparators = (s: string): string => {
+  if (!s) return "";
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
+export default function ProjectsClient({ projects, personnel, currentStatus, subordinateCount, isCEO }: {
+  projects: any[]; personnel: any[]; currentStatus: string; subordinateCount: number; isCEO: boolean;
+}) {
   const router = useRouter();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
   
   const [projectSearch, setProjectSearch] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [personnelSearch, setPersonnelSearch] = useState("");
   const [selectedPersonnel, setSelectedPersonnel] = useState<any[]>([]);
   const [projectLeaderId, setProjectLeaderId] = useState<string>("");
   
@@ -51,6 +69,7 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
   const [phaseLeaderId, setPhaseLeaderId] = useState<string>("");
 
   const [toast, setToast] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [isMounted, setIsMounted] = useState(false);
   const [startDateVal, setStartDateVal] = useState<any>(null);
@@ -58,18 +77,25 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
   const [endDateVal, setEndDateVal] = useState<any>(null);
   const [deadlineDateVal, setDeadlineDateVal] = useState<any>(null);
 
+  const [budgetVal, setBudgetVal] = useState("");
+
   useEffect(() => { setIsMounted(true); }, []);
+
+  const showToast = (msg: string, ms = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), ms);
+  };
 
   const handleTabChange = (status: string) => { router.push(`/dashboard/projects?status=${status}`); };
 
   const filteredProjects = projects.filter(p => 
-    p.Project_Name.toLowerCase().includes(projectSearch.toLowerCase()) ||
-    p.Project_Code.toLowerCase().includes(projectSearch.toLowerCase())
+    p.Project_Name?.toLowerCase().includes(projectSearch.toLowerCase()) ||
+    p.Project_Code?.toLowerCase().includes(projectSearch.toLowerCase())
   );
 
   const filteredPersonnel = personnel.filter((p: any) => 
-    p.Full_Name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.Personnel_Code.toLowerCase().includes(searchTerm.toLowerCase())
+    p.Full_Name?.toLowerCase().includes(personnelSearch.toLowerCase()) ||
+    (p.Personnel_Code || "").toLowerCase().includes(personnelSearch.toLowerCase())
   );
 
   const togglePersonnelSelection = (p: any) => {
@@ -108,8 +134,7 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
   const handleAddPhase = () => {
     const memberIds = Object.keys(phaseMembers).map(Number);
     if (!phaseTitle || !phaseStart || !phaseEnd || memberIds.length === 0 || !phaseLeaderId) {
-      setToast("لطفاً نام فاز، تاریخ‌ها، اعضا و مسئول فاز را مشخص کنید");
-      setTimeout(() => setToast(null), 3000);
+      showToast("لطفاً نام فاز، تاریخ‌ها، اعضا و مسئول فاز را مشخص کنید");
       return;
     }
     
@@ -134,16 +159,27 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
     setProjectPhases(prev => prev.filter((_, i) => i !== index));
   };
 
+  const resetForm = () => {
+    setSelectedPersonnel([]);
+    setProjectPhases([]);
+    setProjectLeaderId("");
+    setStartDateVal(null); setGoldenDateVal(null); setEndDateVal(null); setDeadlineDateVal(null);
+    setPersonnelSearch("");
+    setBudgetVal("");
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (selectedPersonnel.length > 0 && !projectLeaderId) {
-      setToast("لطفاً مسئول پروژه را انتخاب کنید");
-      setTimeout(() => setToast(null), 3000);
+      showToast("لطفاً مسئول پروژه را انتخاب کنید");
       return;
     }
 
+    setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
+    
+    formData.append('budget', budgetVal || '0');
     
     const startStr = formatToLocalISO(startDateVal);
     const goldenStr = formatToLocalISO(goldenDateVal);
@@ -175,19 +211,24 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
     });
     formData.append('phaseCount', String(projectPhases.length));
     
-    await createProjectAction(formData);
+    const result: any = await createProjectAction(formData);
+    setIsSubmitting(false);
+
+    if (result?.error) {
+      showToast(`خطا: ${result.error}`, 5000);
+      return;
+    }
+
     setIsModalOpen(false);
-    setSelectedPersonnel([]);
-    setProjectPhases([]);
-    setProjectLeaderId("");
-    setStartDateVal(null); setGoldenDateVal(null); setEndDateVal(null); setDeadlineDateVal(null);
-    setToast("پروژه با موفقیت ثبت شد");
-    setTimeout(() => setToast(null), 3000);
+    resetForm();
+    showToast("پروژه با موفقیت ثبت شد");
+    router.refresh();
   };
 
   const inputStyle: React.CSSProperties = { width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #e2e8f0", outline: "none", fontSize: "14px", fontFamily: "inherit", backgroundColor: "#f8fafc", boxSizing: "border-box" };
   const dateInputStyle: React.CSSProperties = { ...inputStyle, padding: "10px", textAlign: "center", boxShadow: "none" };
   const labelStyle: React.CSSProperties = { display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" };
+  const moneyInputStyle: React.CSSProperties = { ...inputStyle, textAlign: "left", direction: "ltr", fontWeight: 600 };
 
   return (
     <div style={{ backgroundColor: "#f1f5f9", minHeight: "100vh", padding: "24px" }}>
@@ -199,12 +240,12 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
         .erp-modal-container { background: white; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 100%; max-width: 900px; max-height: 90vh; overflow-y: auto; border-top: 4px solid #ed6e2b; animation: scaleIn 0.2s ease-out; }
         .erp-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: white; z-index: 10; border-radius: 20px 20px 0 0; }
         .erp-modal-body { padding: 24px; }
-        .erp-input { width: 100%; padding: 12px 16px"; border-radius: 10px; border: 1px solid #e2e8f0; outline: none; font-size: 14px; font-family: inherit; background-color: #f8fafc; transition: all 0.2s; box-sizing: border-box; }
+        .erp-input { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid #e2e8f0; outline: none; font-size: 14px; font-family: inherit; background-color: #f8fafc; transition: all 0.2s; box-sizing: border-box; }
         .erp-input:focus { border-color: #ed6e2b; background-color: white; box-shadow: 0 0 0 3px rgba(237, 110, 43, 0.1); }
         .erp-btn-close { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: none; background: #f1f5f9; color: #64748b; cursor: pointer; transition: all 0.2s; }
         .erp-btn-close:hover { background: #e2e8f0; color: #0f172a; transform: rotate(90deg); }
         .erp-btn-submit { display: flex; align-items: center; gap: 8px; padding: 12px 28px; background: linear-gradient(135deg, #ed6e2b 0%, #ea580c 100%); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(237, 110, 43, 0.2); transition: all 0.2s; }
-        .erp-section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 16px 0; font-size: 14px; fontWeight: bold; color: #334155; }
+        .erp-section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 16px 0; font-size: 14px; font-weight: bold; color: #334155; }
         .erp-section-title::before { content: ''; width: 4px; height: 16px; background: #ed6e2b; border-radius: 2px; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
@@ -229,6 +270,16 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
         </button>
       </div>
 
+      {/* ✅ راهنمای سلسله‌مراتب */}
+      <div style={{ backgroundColor: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "12px", padding: "10px 16px", marginBottom: "16px", fontSize: "12px", color: "#1d4ed8", display: "flex", alignItems: "center", gap: "8px" }}>
+        <Info style={{ width: "14px", height: "14px", flexShrink: 0 }} />
+        {subordinateCount > 0
+          ? `شما فقط می‌توانید پروژه‌های تیمِ زیرمجموعه‌های مستقیم خود (${subordinateCount.toLocaleString("fa-IR")} نفر) را صادر کنید. لیست، پروژه‌های صادرشده توسط شما و پروژه‌هایی که مسئولشان زیرمجموعه مستقیم شماست را نشان می‌دهد.`
+          : isCEO
+            ? "به‌عنوان مدیرعامل: تیم پروژه فقط از زیرمجموعه‌های مستقیم (پرسنل بدون سرپرست) قابل انتخاب است."
+            : "شما زیرمجموعه‌ای ندارید — برای صدور پروژه، ابتدا از «تنظیمات سرپرستی» زیرمجموعه تعیین کنید."}
+      </div>
+
       {/* جدول پروژه‌ها */}
       <div style={{ backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
         <div style={{ overflowX: "auto" }}>
@@ -241,7 +292,6 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
                 <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>بودجه</th>
                 <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>تاریخ طلایی</th>
                 <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>تاریخ پایان</th>
-                {/* ستون‌های جدید */}
                 <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>تاریخ تاخیر</th>
                 <th style={{ padding: "16px", fontSize: "13px", fontWeight: 700, color: "#64748b" }}>ضریب رضایت مدیر</th>
               </tr>
@@ -265,7 +315,6 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
                     </div>
                   </td>
                   <td style={{ padding: "16px", fontSize: "14px", color: "#334155" }}>{toPersianDate(p.End_Date)}</td>
-                  {/* مقادیر ستون‌های جدید */}
                   <td style={{ padding: "16px", fontSize: "14px", color: "#ef4444", fontWeight: 600 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                       <AlertTriangle style={{ width: "14px", height: "14px" }} />
@@ -292,7 +341,10 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
             <div className="erp-modal-header">
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <div style={{ background: "#fff7ed", padding: "10px", borderRadius: "12px" }}><Briefcase style={{ width: "24px", height: "24px", color: "#ed6e2b" }} /></div>
-                <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "bold", color: "#0f172a" }}>ثبت پروژه جدید</h2>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "bold", color: "#0f172a" }}>ثبت پروژه جدید</h2>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#64748b" }}>فقط زیرمجموعه‌های مستقیم شما قابل انتخاب هستند</p>
+                </div>
               </div>
               <button className="erp-btn-close" onClick={() => setIsModalOpen(false)}><X style={{ width: "20px", height: "20px" }} /></button>
             </div>
@@ -306,7 +358,23 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
               <div><label style={labelStyle}>کد پروژه *</label><input name="projectCode" required type="text" className="erp-input" placeholder="مثال: PRJ-001" /></div>
               <div><label style={labelStyle}>نام پروژه *</label><input name="projectName" required type="text" className="erp-input" placeholder="نام پروژه" /></div>
               <div style={{ gridColumn: "1 / -1" }}><label style={labelStyle}>شرح پروژه</label><textarea name="description" rows={2} className="erp-input" style={{ resize: "vertical" }} placeholder="توضیحات پروژه..."></textarea></div>
-              <div><label style={labelStyle}>بودجه کل (ریال)</label><input name="budget" type="number" min="0" className="erp-input" placeholder="0" /></div>
+              <div>
+                <label style={labelStyle}>بودجه کل (ریال)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="erp-input"
+                  style={moneyInputStyle}
+                  placeholder="0"
+                  value={formatWithSeparators(budgetVal)}
+                  onChange={(e) => setBudgetVal(stripSeparators(e.target.value))}
+                />
+                {budgetVal && (
+                  <p style={{ margin: "6px 0 0 0", fontSize: "12px", fontWeight: 700, color: "#c2410c" }}>
+                    {Number(budgetVal).toLocaleString("fa-IR")} ریال
+                  </p>
+                )}
+              </div>
               <div><label style={labelStyle}>تاریخ شروع</label>{isMounted ? <DatePicker value={startDateVal} calendar={persian} locale={persian_fa} calendarPosition="bottom-right" onChange={setStartDateVal} format="YYYY/MM/DD" style={dateInputStyle} /> : <input type="text" className="erp-input" disabled />}</div>
 
               <div style={{ gridColumn: "1 / -1", marginTop: "12px" }}>
@@ -360,9 +428,21 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
                           </div>
                           <div>
                             <label style={{ display: "block", fontSize: "10px", color: "#64748b", marginBottom: "4px" }}>دستمزد (ریال)</label>
-                            <input type="number" min="0" value={p.personnelWage || ""} onChange={(e) => updatePersonnelWage(p.Personnel_ID, e.target.value)} placeholder="0" style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", fontFamily: "inherit", backgroundColor: "white", boxSizing: "border-box" }} />
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={formatWithSeparators(p.personnelWage || "")}
+                              onChange={(e) => updatePersonnelWage(p.Personnel_ID, stripSeparators(e.target.value))}
+                              placeholder="0"
+                              style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "12px", fontFamily: "inherit", backgroundColor: "white", boxSizing: "border-box", textAlign: "left", direction: "ltr", fontWeight: 600 }}
+                            />
                           </div>
-                          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
+                          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-end", gap: "2px" }}>
+                            {p.personnelWage ? (
+                              <span style={{ fontSize: "11px", fontWeight: 700, color: "#c2410c", whiteSpace: "nowrap" }}>
+                                {Number(p.personnelWage).toLocaleString("fa-IR")} ریال
+                              </span>
+                            ) : <span style={{ fontSize: "11px", color: "#cbd5e1" }}>-</span>}
                             <button type="button" onClick={() => togglePersonnelSelection(p)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ef4444", padding: "4px" }}>
                               <X style={{ width: "16px", height: "16px" }} />
                             </button>
@@ -373,7 +453,7 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
                   </div>
                 )}
                 <button type="button" onClick={() => setIsPersonnelModalOpen(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "12px", border: "1px dashed #cbd5e1", borderRadius: "10px", backgroundColor: "#f8fafc", cursor: "pointer", color: "#64748b", fontWeight: 600 }}>
-                  <Users style={{ width: "18px", height: "18px" }} /> انتخاب از لیست پرسنل
+                  <Users style={{ width: "18px", height: "18px" }} /> انتخاب از زیرمجموعه‌های من
                 </button>
 
                 {selectedPersonnel.length > 0 && (
@@ -463,7 +543,9 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
               </div>
 
               <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", paddingTop: "12px", borderTop: "1px solid #f1f5f9" }}>
-                <button type="submit" className="erp-btn-submit"><Save style={{ width: "18px", height: "18px" }} /> ثبت پروژه</button>
+                <button type="submit" disabled={isSubmitting} className="erp-btn-submit" style={{ opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? "wait" : "pointer" }}>
+                  <Save style={{ width: "18px", height: "18px" }} /> {isSubmitting ? "در حال ثبت..." : "ثبت پروژه"}
+                </button>
               </div>
             </form>
           </div>
@@ -488,27 +570,38 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
             <div className="erp-modal-body">
               <div style={{ position: "relative", marginBottom: "24px" }}>
                 <Search style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", width: "20px", height: "20px", color: "#94a3b8" }} />
-                <input type="text" className="erp-input" style={{ paddingRight: "40px" }} placeholder="جستجوی پرسنل..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} autoFocus />
+                <input type="text" className="erp-input" style={{ paddingRight: "40px" }} placeholder="جستجوی پرسنل..." value={personnelSearch} onChange={(e) => setPersonnelSearch(e.target.value)} autoFocus />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px", maxHeight: "50vh", overflowY: "auto", padding: "4px" }}>
-                {filteredPersonnel.map((p: any) => {
-                  const isSelected = selectedPersonnel.find(item => item.Personnel_ID === p.Personnel_ID);
-                  return (
-                    <div key={p.Personnel_ID} onClick={() => togglePersonnelSelection(p)} style={{ backgroundColor: isSelected ? "#fff7ed" : "white", border: `1px solid ${isSelected ? "#ed6e2b" : "#e2e8f0"}`, borderRadius: "16px", padding: "16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", cursor: "pointer", position: "relative", transition: "all 0.2s" }}>
-                      {isSelected && <div style={{ position: "absolute", top: "8px", left: "8px", backgroundColor: "#ed6e2b", borderRadius: "50%", padding: "2px" }}><Check style={{ width: "14px", height: "14px", color: "white" }} /></div>}
-                      <div style={{ width: "60px", height: "60px", borderRadius: "50%", overflow: "hidden", backgroundColor: "#f1f5f9" }}>
-                        {p.Personal_Image_Path ? <img src={p.Personal_Image_Path} alt={p.Full_Name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UserCircle2 style={{ width: "100%", height: "100%", color: "#cbd5e1" }} />}
+              {/* ✅ حالت خالی: بدون زیرمجموعه */}
+              {personnel.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8", fontSize: "13px" }}>
+                  <Users style={{ width: "40px", height: "40px", color: "#cbd5e1", margin: "0 auto 12px", display: "block" }} />
+                  شما زیرمجموعه‌ای ندارید — از صفحه «تنظیمات سرپرستی» زیرمجموعه تعیین کنید تا بتوانید پروژه صادر کنید.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px", maxHeight: "50vh", overflowY: "auto", padding: "4px" }}>
+                  {filteredPersonnel.map((p: any) => {
+                    const isSelected = selectedPersonnel.find(item => item.Personnel_ID === p.Personnel_ID);
+                    return (
+                      <div key={p.Personnel_ID} onClick={() => togglePersonnelSelection(p)} style={{ backgroundColor: isSelected ? "#fff7ed" : "white", border: `1px solid ${isSelected ? "#ed6e2b" : "#e2e8f0"}`, borderRadius: "16px", padding: "16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", cursor: "pointer", position: "relative", transition: "all 0.2s" }}>
+                        {isSelected && <div style={{ position: "absolute", top: "8px", left: "8px", backgroundColor: "#ed6e2b", borderRadius: "50%", padding: "2px" }}><Check style={{ width: "14px", height: "14px", color: "white" }} /></div>}
+                        <div style={{ width: "60px", height: "60px", borderRadius: "50%", overflow: "hidden", backgroundColor: "#f1f5f9" }}>
+                          {p.Personal_Image_Path ? <img src={p.Personal_Image_Path} alt={p.Full_Name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UserCircle2 style={{ width: "100%", height: "100%", color: "#cbd5e1" }} />}
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <p style={{ margin: 0, fontSize: "14px", fontWeight: "bold", color: "#0f172a" }}>{p.Full_Name}</p>
+                          <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#64748b" }}>{p.Personnel_Code}</p>
+                        </div>
+                        <span style={{ fontSize: "11px", backgroundColor: "#f1f5f9", color: "#475569", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>{translateRole(p.Role)}</span>
                       </div>
-                      <div style={{ textAlign: "center" }}>
-                        <p style={{ margin: 0, fontSize: "14px", fontWeight: "bold", color: "#0f172a" }}>{p.Full_Name}</p>
-                        <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "#64748b" }}>{p.Personnel_Code}</p>
-                      </div>
-                      <span style={{ fontSize: "11px", backgroundColor: "#f1f5f9", color: "#475569", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>{translateRole(p.Role)}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                  {filteredPersonnel.length === 0 && (
+                    <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "#94a3b8", fontSize: "13px", padding: "20px" }}>پرسنلی با این مشخصات یافت نشد</div>
+                  )}
+                </div>
+              )}
               
               <div style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end" }}>
                 <button onClick={() => setIsPersonnelModalOpen(false)} className="erp-btn-submit"><CheckCircle style={{ width: "18px", height: "18px" }} /> تایید و بستن</button>
@@ -518,7 +611,7 @@ export default function ProjectsClient({ projects, personnel, currentStatus }: {
         </div>
       )}
 
-      {toast && (<div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#0f172a', color: 'white', padding: '12px 24px', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500, animation: 'slideUp 0.3s ease-out' }}><CheckCircle style={{ width: '20px', height: '20px', color: '#10b981' }} />{toast}</div>)}
+      {toast && (<div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#0f172a', color: 'white', padding: '12px 24px', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500, animation: 'slideUp 0.3s ease-out' }}><CheckCircle style={{ width: '20px', height: '20px', color: toast.includes('خطا') ? '#f87171' : '#10b981' }} />{toast}</div>)}
     </div>
   );
 }

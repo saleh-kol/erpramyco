@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { savePersonnelHoursAction } from "@/actions/hoursSettings";
 import {
   Search,
@@ -18,16 +19,18 @@ export default function HoursSettingsClient({
 }: {
   personnel: any[];
 }) {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false); // ✅ ضد دابل‌کلیک
 
   const filteredPersonnel = personnel.filter(
     (p) =>
-      p.Full_Name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.Personnel_Code.toLowerCase().includes(searchTerm.toLowerCase())
+      p.Full_Name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.Personnel_Code || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const openModal = (person: any) => {
@@ -44,62 +47,49 @@ export default function HoursSettingsClient({
 
   const showToast = (message: string) => {
     setToast(message);
-
-    setTimeout(() => {
-      setToast(null);
-    }, 3000);
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSubmit = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
+  // ✅ فیکس: اکشن دیگر throw نمی‌کند — نتیجه را چک می‌کنیم
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError(null);
 
     const formData = new FormData(e.currentTarget);
 
     const fields = [
-      "Week1_Max_Hours",
-      "Week1_Max_Overtime",
-      "Week2_Max_Hours",
-      "Week2_Max_Overtime",
-      "Week3_Max_Hours",
-      "Week3_Max_Overtime",
-      "Week4_Max_Hours",
-      "Week4_Max_Overtime",
-      "MonthEnd_Max_Hours",
-      "MonthEnd_Max_Overtime",
-      "Max_Friday_Hours_Month",
-      "Max_Holiday_Hours_Month",
+      "Week1_Max_Hours", "Week1_Max_Overtime",
+      "Week2_Max_Hours", "Week2_Max_Overtime",
+      "Week3_Max_Hours", "Week3_Max_Overtime",
+      "Week4_Max_Hours", "Week4_Max_Overtime",
+      "MonthEnd_Max_Hours", "MonthEnd_Max_Overtime",
+      "Max_Friday_Hours_Month", "Max_Holiday_Hours_Month",
     ];
 
     let isValid = true;
-
     fields.forEach((field) => {
       const value = formData.get(field);
-
-      if (value === "" || value === null) {
-        isValid = false;
-      }
+      if (value === "" || value === null) isValid = false;
     });
 
     if (!isValid) {
-      setFormError(
-        "لطفاً تمام فیلدها را پر کنید. هیچ فیلدی نمی‌تواند خالی باشد."
-      );
+      setFormError("لطفاً تمام فیلدها را پر کنید. هیچ فیلدی نمی‌تواند خالی باشد.");
       return;
     }
 
-    try {
-      await savePersonnelHoursAction(formData);
+    setIsSaving(true);
+    const result: any = await savePersonnelHoursAction(formData);
+    setIsSaving(false);
 
-      closeModal();
-      showToast("تنظیمات ساعات کاری با موفقیت ذخیره شد");
-    } catch {
-      setFormError(
-        "ذخیره تنظیمات با خطا مواجه شد. لطفاً دوباره تلاش کنید."
-      );
+    // ✅ پیام خطای واقعی سرور نمایش داده می‌شود
+    if (result?.error) {
+      setFormError(result.error);
+      return;
     }
+
+    closeModal();
+    showToast("تنظیمات ساعات کاری با موفقیت ذخیره شد");
+    router.refresh(); // ✅ داده صفحه به‌روز شود — رکورد مالی تازه‌ساخت در باز شدن بعدی دیده می‌شود
   };
 
   const weekSettings = [
@@ -506,10 +496,11 @@ export default function HoursSettingsClient({
 
                 <button
                   type="submit"
-                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ed6e2b] px-7 text-sm font-bold text-white shadow-sm transition hover:bg-[#d95f20] hover:shadow-md active:scale-[0.98]"
+                  disabled={isSaving}
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ed6e2b] px-7 text-sm font-bold text-white shadow-sm transition hover:bg-[#d95f20] hover:shadow-md active:scale-[0.98] disabled:opacity-60 disabled:cursor-wait"
                 >
                   <Save className="h-5 w-5" />
-                  ذخیره تنظیمات
+                  {isSaving ? "در حال ذخیره..." : "ذخیره تنظیمات"}
                 </button>
               </div>
             </form>

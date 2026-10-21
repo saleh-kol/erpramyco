@@ -4,24 +4,22 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { updateMissionAction, deleteMissionAction } from "@/actions/missions";
 import {
-  ArrowRight, Save, CheckCircle, Trash2, AlertTriangle, Navigation, UserCircle2, Info, Clock, X
+  ArrowRight, Save, CheckCircle, Trash2, AlertTriangle, Navigation, UserCircle2,
+  Info, Clock, X, FileText, FileImage, FileSpreadsheet, File as FileIcon, Paperclip, Download,
 } from "lucide-react";
+import {
+  toPersianDate, translateCommuteType, formatFileSize, getAttachmentIconType, formatAmount,
+} from "@/lib/mission/constants";
 
-const toPersianDate = (date: Date | string) => { if (!date) return "-"; const d = new Date(date); if (isNaN(d.getTime())) return "-"; return d.toLocaleDateString("fa-IR"); };
-const translateCommuteType = (type: string) => { 
-  const types: any = { "CompanyVehicle": "وسیله نقلیه شرکت", "PersonalVehicle": "وسیله نقلیه شخصی", "PublicTransport": "حمل و نقل عمومی", "Taxi": "تاکسی", "Other": "سایر" }; 
-  return types[type] || type || "-"; 
-};
-
-export default function MissionDetailClient({ data }: { data: any }) {
+export default function MissionDetailClient({ data, canReview }: { data: any; canReview: boolean }) {
   const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  
+
   // استیت برای محاسبه زنده ضریب مدیر
   const [liveManagerScore, setLiveManagerScore] = useState<number>(data.Manager_Score || 100);
-  
-  // استیت جدید برای ۳ حالت ارزیابی
+
+  // استیت برای ۳ حالت ارزیابی
   const [reviewAction, setReviewAction] = useState<string>(
     data.Is_Approved ? 'Approved' : (data.Status === 'Rejected' ? 'Rejected' : 'NeedsRevision')
   );
@@ -30,7 +28,13 @@ export default function MissionDetailClient({ data }: { data: any }) {
     setReviewAction(data.Is_Approved ? 'Approved' : (data.Status === 'Rejected' ? 'Rejected' : 'NeedsRevision'));
   }, [data.Is_Approved, data.Status]);
 
-  // تابع محاسبه مبلغ نهایی پرداختی
+  // ---------- Toast ----------
+  const showToast = (msg: string, ms = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), ms);
+  };
+
+  // تابع محاسبه مبلغ نهایی پرداختی (دست نخورده)
   const calculateFinalAmount = () => {
     const baseAmount = Number(data.Amount || 0);
     const score = Number(liveManagerScore || 100) / 100;
@@ -43,31 +47,37 @@ export default function MissionDetailClient({ data }: { data: any }) {
     const formData = new FormData(e.currentTarget);
     formData.append('reviewAction', reviewAction);
     formData.append('managerScore', String(liveManagerScore));
-    
-    await updateMissionAction(formData);
-    setToast("تغییرات ماموریت با موفقیت ذخیره شد");
-    setTimeout(() => setToast(null), 3000);
+
+    // 🔧 بهبود: هندل خطای سرور (قبل از این نادیده گرفته می‌شد)
+    const result: any = await updateMissionAction(formData);
+    if (result?.error) {
+      showToast(`خطا: ${result.error}`, 5000);
+      return;
+    }
+    showToast("تغییرات ماموریت با موفقیت ذخیره شد");
   };
 
   const handleDelete = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const result: any = await deleteMissionAction(formData);
-    
+
     if (result?.success) {
       setShowDeleteModal(false);
-      setToast("ماموریت با موفقیت حذف شد");
+      showToast("ماموریت با موفقیت حذف شد");
       setTimeout(() => { router.push("/dashboard/missions"); }, 2000);
     } else {
-      setToast(result?.error || "خطا در حذف ماموریت");
-      setTimeout(() => setToast(null), 5000);
+      showToast(result?.error || "خطا در حذف ماموریت", 5000);
     }
   };
 
+  // ---------- استایل‌ها ----------
   const inputStyle: React.CSSProperties = { width: "100%", padding: "12px 16px", borderRadius: "10px", border: "1px solid #e2e8f0", outline: "none", fontSize: "14px", fontFamily: "inherit", backgroundColor: "#f8fafc", boxSizing: "border-box", transition: "all 0.2s" };
   const disabledStyle: React.CSSProperties = { ...inputStyle, backgroundColor: "#f1f5f9", color: "#64748b", cursor: "not-allowed" };
   const cardStyle: React.CSSProperties = { backgroundColor: "white", borderRadius: "16px", border: "1px solid #e2e8f0", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" };
   const headerStyle: React.CSSProperties = { margin: "0 0 20px 0", fontSize: "16px", fontWeight: "bold", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" };
+
+  const attachments = data.Mission_Attachments || [];
 
   return (
     <div style={{ backgroundColor: "#f1f5f9", minHeight: "100vh", padding: "24px" }}>
@@ -82,7 +92,7 @@ export default function MissionDetailClient({ data }: { data: any }) {
         @keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
       `}</style>
 
-      {/* هدر صفحه */}
+      {/* هدر صفحه — دست نخورده */}
       <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "20px 24px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <button onClick={() => router.push("/dashboard/missions")} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", padding: "10px", cursor: "pointer", backgroundColor: "white" }}>
@@ -100,12 +110,11 @@ export default function MissionDetailClient({ data }: { data: any }) {
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px", alignItems: "start" }}>
-        
+
         {/* ستون راست: اطلاعات ماموریت */}
         <div style={cardStyle}>
           <h2 style={headerStyle}><div style={{ width: "4px", height: "20px", backgroundColor: "#ed6e2b", borderRadius: "2px" }}></div> اطلاعات ماموریت</h2>
-          
-          {/* اصلاح شد: فیلدهای مبدا و مقصد قابل ویرایش هستند */}
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
             <div>
               <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>مبدا</label>
@@ -139,15 +148,65 @@ export default function MissionDetailClient({ data }: { data: any }) {
             </div>
           </div>
 
-          <div>
+          <div style={{ marginBottom: "16px" }}>
             <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>توضیحات</label>
             <textarea name="description" rows={4} defaultValue={data.Description || ""} className="erp-input" style={{ ...inputStyle, resize: "vertical" }}></textarea>
           </div>
+
+          {/* ✅ جدید: گزارش ماموریت ثبت‌شده توسط پرسنل — فقط خواندنی */}
+          <div style={{ backgroundColor: "#fff7ed", padding: "14px", borderRadius: "10px", border: "1px solid #fed7aa", marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+              <FileText style={{ width: "15px", height: "15px", color: "#c2410c" }} />
+              <span style={{ fontSize: "12px", color: "#c2410c", fontWeight: "600" }}>گزارش ماموریت (ثبت شده توسط پرسنل)</span>
+            </div>
+            <p style={{ margin: 0, fontSize: "13px", color: "#334155", lineHeight: "1.7", whiteSpace: "pre-wrap" }}>
+              {data.Mission_Report || "گزارشی ثبت نشده است."}
+            </p>
+          </div>
+
+          {/* ✅ جدید: پیوست‌های پرسنل — فقط مشاهده/دانلود */}
+          <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px dashed #cbd5e1" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+              <Paperclip style={{ width: "15px", height: "15px", color: "#475569" }} />
+              <span style={{ fontSize: "12px", color: "#475569", fontWeight: "600" }}>
+                پیوست‌های ماموریت {attachments.length > 0 && `(${attachments.length})`}
+              </span>
+            </div>
+
+            {attachments.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {attachments.map((att: any) => {
+                  const iconType = getAttachmentIconType(att.File_Name);
+                  const Icon = iconType === "image" ? FileImage : iconType === "excel" ? FileSpreadsheet : iconType === "word" ? FileText : FileIcon;
+                  const iconColor = iconType === "word" ? "#1d4ed8" : iconType === "file" ? "#64748b" : "#16a34a";
+                  return (
+                    <div key={att.Attachment_ID} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "8px 12px", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                        <Icon style={{ width: "18px", height: "18px", color: iconColor, flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "300px" }}>{att.File_Name}</p>
+                          <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>{formatFileSize(att.File_Size)}</p>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                        <a href={att.File_Path} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 10px", backgroundColor: "#eff6ff", color: "#1d4ed8", borderRadius: "6px", fontSize: "11px", fontWeight: "600", textDecoration: "none" }}>مشاهده</a>
+                        <a href={att.File_Path} download={att.File_Name} style={{ padding: "5px 10px", backgroundColor: "#f0fdf4", color: "#166534", borderRadius: "6px", fontSize: "11px", fontWeight: "600", textDecoration: "none", display: "flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+                          <Download style={{ width: "12px", height: "12px" }} /> دانلود
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>پیوستی ثبت نشده است.</p>
+            )}
+          </div>
         </div>
 
-        {/* ستون چپ: پرسنل، ارزیابی مدیر و محاسبه پاداش */}
+        {/* ستون چپ: پرسنل، ارزیابی مدیر و محاسبه پاداش — کاملاً دست نخورده */}
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          
+
           {/* باکس اطلاعات پرسنل */}
           <div style={cardStyle}>
             <h2 style={headerStyle}><div style={{ width: "4px", height: "20px", backgroundColor: "#ed6e2b", borderRadius: "2px" }}></div> پرسنل مربوطه</h2>
@@ -162,22 +221,22 @@ export default function MissionDetailClient({ data }: { data: any }) {
             </div>
           </div>
 
-          {/* باکس ارزیابی و تایید مدیر */}
+          {/* باکس ارزیابی و تایید مدیر — دست نخورده */}
           <div style={{ ...cardStyle, border: "2px solid #ed6e2b" }}>
             <h2 style={headerStyle}><div style={{ width: "4px", height: "20px", backgroundColor: "#ed6e2b", borderRadius: "2px" }}></div> ارزیابی و تایید مدیر</h2>
             <input type="hidden" name="commuteId" defaultValue={data.Commute_ID || ""} />
 
             <div style={{ marginBottom: "16px" }}>
               <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>ضریب رضایت مدیر (۰ تا ۱۰۰)</label>
-              <input 
-                type="number" 
-                min="0" 
-                max="100" 
-                value={liveManagerScore} 
-                onChange={(e) => setLiveManagerScore(Number(e.target.value))} 
-                className="erp-input" 
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={liveManagerScore}
+                onChange={(e) => setLiveManagerScore(Number(e.target.value))}
+                className="erp-input"
                 style={inputStyle}
-                placeholder="مثلاً 90" 
+                placeholder="مثلاً 90"
               />
               <p style={{ margin: "4px 0 0 0", fontSize: "11px", color: "#ef4444" }}>⚠️ هر واحد کاهش، ۱٪ از مبلغ پرداختی کسر می‌شود.</p>
             </div>
@@ -191,25 +250,25 @@ export default function MissionDetailClient({ data }: { data: any }) {
               <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>وضعیت ارزیابی ماموریت</label>
               <div style={{ display: "flex", gap: "8px" }}>
                 {/* دکمه تایید */}
-                <button 
-                  type="button" 
-                  onClick={() => setReviewAction('Approved')} 
+                <button
+                  type="button"
+                  onClick={() => setReviewAction('Approved')}
                   style={{ flex: 1, padding: "10px", borderRadius: "10px", border: `1px solid ${reviewAction === 'Approved' ? "#16a34a" : "#e2e8f0"}`, backgroundColor: reviewAction === 'Approved' ? "#f0fdf4" : "white", color: reviewAction === 'Approved' ? "#166534" : "#64748b", cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}
                 >
                   <CheckCircle style={{ width: "16px", height: "16px" }} /> تایید
                 </button>
                 {/* دکمه نیاز به بازنگری */}
-                <button 
-                  type="button" 
-                  onClick={() => setReviewAction('NeedsRevision')} 
+                <button
+                  type="button"
+                  onClick={() => setReviewAction('NeedsRevision')}
                   style={{ flex: 1, padding: "10px", borderRadius: "10px", border: `1px solid ${reviewAction === 'NeedsRevision' ? "#f59e0b" : "#e2e8f0"}`, backgroundColor: reviewAction === 'NeedsRevision' ? "#fffbeb" : "white", color: reviewAction === 'NeedsRevision' ? "#d97706" : "#64748b", cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}
                 >
                   <Clock style={{ width: "16px", height: "16px" }} /> بازنگری
                 </button>
                 {/* دکمه رد */}
-                <button 
-                  type="button" 
-                  onClick={() => setReviewAction('Rejected')} 
+                <button
+                  type="button"
+                  onClick={() => setReviewAction('Rejected')}
                   style={{ flex: 1, padding: "10px", borderRadius: "10px", border: `1px solid ${reviewAction === 'Rejected' ? "#ef4444" : "#e2e8f0"}`, backgroundColor: reviewAction === 'Rejected' ? "#fef2f2" : "white", color: reviewAction === 'Rejected' ? "#991b1b" : "#64748b", cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}
                 >
                   <X style={{ width: "16px", height: "16px" }} /> رد
@@ -222,7 +281,7 @@ export default function MissionDetailClient({ data }: { data: any }) {
             </button>
           </div>
 
-          {/* باکس محاسبه زنده مبلغ پرداختی */}
+          {/* باکس محاسبه زنده مبلغ پرداختی — دست نخورده */}
           <div style={cardStyle}>
             <h2 style={headerStyle}><div style={{ width: "4px", height: "20px", backgroundColor: "#ed6e2b", borderRadius: "2px" }}></div> محاسبه مبلغ پرداختی</h2>
             {(() => {
@@ -233,7 +292,7 @@ export default function MissionDetailClient({ data }: { data: any }) {
                 <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "12px", border: "1px solid #f1f5f9" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                     <span style={{ fontSize: "13px", color: "#64748b" }}>مبلغ پایه ثبت شده:</span>
-                    <span style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>{baseAmount.toLocaleString('fa-IR')} ریال</span>
+                    <span style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>{formatAmount(baseAmount)} ریال</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "white", padding: "12px", borderRadius: "10px", border: "1px solid #e2e8f0", marginTop: "8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -241,7 +300,7 @@ export default function MissionDetailClient({ data }: { data: any }) {
                       <span style={{ fontSize: "11px", color: "#64748b" }}>{calc.reason}</span>
                     </div>
                     <span style={{ fontSize: "16px", fontWeight: "bold", color: isProfit ? "#16a34a" : "#ef4444" }}>
-                      {calc.finalAmount.toLocaleString('fa-IR')} ریال
+                      {formatAmount(calc.finalAmount)} ریال
                     </span>
                   </div>
                 </div>
@@ -251,7 +310,7 @@ export default function MissionDetailClient({ data }: { data: any }) {
         </div>
       </form>
 
-      {/* مودال تایید حذف */}
+      {/* مودال تایید حذف — دست نخورده */}
       {showDeleteModal && (
         <div className="erp-modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="erp-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -273,7 +332,10 @@ export default function MissionDetailClient({ data }: { data: any }) {
 
       {toast && (
         <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#0f172a', color: 'white', padding: '12px 24px', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500, animation: 'slideUp 0.3s ease-out' }}>
-          <CheckCircle style={{ width: '20px', height: '20px', color: '#10b981' }} />{toast}
+          {toast.includes("خطا")
+            ? <AlertTriangle style={{ width: '20px', height: '20px', color: '#f87171' }} />
+            : <CheckCircle style={{ width: '20px', height: '20px', color: '#10b981' }} />}
+          {toast}
         </div>
       )}
     </div>

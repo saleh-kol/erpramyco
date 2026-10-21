@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { requestProjectCompletionAction } from "@/actions/myProjects";
 import { Briefcase, X, CheckCircle, Clock, Calendar, User, Award, AlertTriangle, Crown } from "lucide-react";
+import { getTimeFactor, calcMemberBonus } from "@/lib/project/bonus"; // ✅ منطق واحد پاداش
 
 const toPersianDate = (date: Date | string) => {
   if (!date) return "-";
@@ -23,26 +24,37 @@ export default function MyProjectsClient({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const showToast = (msg: string, ms = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), ms);
+  };
 
   const handleTabChange = (status: string) =>
     router.push(`/dashboard/my-projects?status=${status}`);
+
   const openModal = (p: any) => {
     setSelectedProject(p);
     setIsModalOpen(true);
   };
 
+  // ✅ فیکس: خطا → مودال باز بماند + پیام خطا؛ موفقیت → بستن + رفرش
   const handleCompletion = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
-    const result = await requestProjectCompletionAction(formData);
-    
+    const result: any = await requestProjectCompletionAction(formData);
+    setIsSubmitting(false);
+
     if (result?.error) {
-      setToast(result.error);
-    } else {
-      setToast("درخواست اتمام پروژه برای مدیر ارسال شد");
+      showToast(`خطا: ${result.error}`, 5000);
+      return; // مودال باز بماند
     }
+
     setIsModalOpen(false);
-    setTimeout(() => setToast(null), 3000);
+    showToast("درخواست اتمام پروژه برای مدیر ارسال شد");
+    router.refresh(); // پروژه از تب Active به تب OnHold منتقل شود
   };
 
   const getStatusBadge = (status: string) => {
@@ -71,37 +83,31 @@ export default function MyProjectsClient({
           marginBottom: "20px",
           display: "flex",
           gap: "8px",
+          flexWrap: "wrap",
         }}
       >
-        <button
-          onClick={() => handleTabChange("Active")}
-          style={{
-            padding: "10px 20px",
-            borderRadius: "10px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: "bold",
-            backgroundColor: currentStatus === "Active" ? "#ed6e2b" : "#f1f5f9",
-            color: currentStatus === "Active" ? "white" : "#64748b",
-          }}
-        >
-          در حال انجام
-        </button>
-        <button
-          onClick={() => handleTabChange("Completed")}
-          style={{
-            padding: "10px 20px",
-            borderRadius: "10px",
-            border: "none",
-            cursor: "pointer",
-            fontWeight: "bold",
-            backgroundColor:
-              currentStatus === "Completed" ? "#ed6e2b" : "#f1f5f9",
-            color: currentStatus === "Completed" ? "white" : "#64748b",
-          }}
-        >
-          اتمام یافته
-        </button>
+        {/* ✅ تب OnHold اضافه شد — پروژه درخواست‌کرده دیگر محو نمی‌شود */}
+        {[
+          { key: "Active", label: "در حال انجام" },
+          { key: "OnHold", label: "در انتظار تایید اتمام" },
+          { key: "Completed", label: "اتمام یافته" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => handleTabChange(t.key)}
+            style={{
+              padding: "10px 20px",
+              borderRadius: "10px",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: "bold",
+              backgroundColor: currentStatus === t.key ? "#ed6e2b" : "#f1f5f9",
+              color: currentStatus === t.key ? "white" : "#64748b",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <div
@@ -474,10 +480,10 @@ export default function MyProjectsClient({
                     }}
                   >
                     <span style={{ fontSize: "12px", color: "#166534", fontWeight: 600 }}>
-                      پاداش تحویل زودتر ({selectedProject.Golden_Bonus_Percent}%):
+                      ضریب پاداش طلایی ({selectedProject.Golden_Bonus_Percent}%)
                     </span>
-                    <span style={{ fontSize: "14px", fontWeight: "bold", color: "#166534" }}>
-                      +{((Number(selectedProject.Budget) * Number(selectedProject.Golden_Bonus_Percent)) / 100).toLocaleString("fa-IR")} ریال
+                    <span style={{ fontSize: "12px", fontWeight: "600", color: "#64748b" }}>
+                      روی دستمزد پایه شما اعمال می‌شود
                     </span>
                   </div>
                 )}
@@ -528,10 +534,10 @@ export default function MyProjectsClient({
                     }}
                   >
                     <span style={{ fontSize: "12px", color: "#991b1b", fontWeight: 600 }}>
-                      جریمه دیرکرد ({selectedProject.Delay_Penalty_Percent}%):
+                      ضریب جریمه دیرکرد ({selectedProject.Delay_Penalty_Percent}%)
                     </span>
-                    <span style={{ fontSize: "14px", fontWeight: "bold", color: "#991b1b" }}>
-                      -{((Number(selectedProject.Budget) * Number(selectedProject.Delay_Penalty_Percent)) / 100).toLocaleString("fa-IR")} ریال
+                    <span style={{ fontSize: "12px", fontWeight: "600", color: "#64748b" }}>
+                      روی دستمزد پایه شما اعمال می‌شود
                     </span>
                   </div>
                 )}
@@ -568,33 +574,47 @@ export default function MyProjectsClient({
               </span>
             </div>
 
-            {/* پاداش نهایی (بعد از تکمیل) */}
-            {selectedProject.Final_Bonus != null && selectedProject.Status === "Completed" && (
-              <div
-                style={{
-                  backgroundColor: "#f0fdf4",
-                  padding: "16px",
-                  borderRadius: "10px",
-                  marginBottom: "24px",
-                  border: "2px solid #16a34a",
-                  textAlign: "center",
-                }}
-              >
-                <span style={{ fontSize: "12px", color: "#166534", fontWeight: 600 }}>
-                  🎉 مبلغ نهایی دریافتی شما
-                </span>
-                <p
-                  style={{
-                    margin: "4px 0 0 0",
-                    fontSize: "24px",
-                    fontWeight: "bold",
-                    color: "#166534",
-                  }}
-                >
-                  {Number(selectedProject.Final_Bonus).toLocaleString("fa-IR")} ریال
-                </p>
-              </div>
-            )}
+            {/* ✅ پاداش نهایی — منبع واحد: lib/project/bonus */}
+            {(() => {
+              const wage = Number(selectedProject.My_Wage || 0);
+
+              // اتمام یافته → پاداش ذخیره‌شده برای «این عضو»
+              if (selectedProject.Status === "Completed" && selectedProject.My_Final_Bonus != null) {
+                return (
+                  <div style={{ backgroundColor: "#f0fdf4", padding: "16px", borderRadius: "10px", marginBottom: "24px", border: "2px solid #16a34a", textAlign: "center" }}>
+                    <span style={{ fontSize: "12px", color: "#166534", fontWeight: 600 }}>
+                      🎉 پاداش نهایی شما از این پروژه
+                    </span>
+                    <p style={{ margin: "4px 0 0 0", fontSize: "24px", fontWeight: "bold", color: "#166534" }}>
+                      {Number(selectedProject.My_Final_Bonus).toLocaleString("fa-IR")} ریال
+                    </p>
+                    <p style={{ margin: "6px 0 0 0", fontSize: "11px", color: "#64748b" }}>
+                      دستمزد پایه: {wage.toLocaleString("fa-IR")} ریال × ضریب زمانی × ضریب مدیر ({selectedProject.Manager_Score ?? 100}٪)
+                    </p>
+                  </div>
+                );
+              }
+
+              // در حال انجام → پیش‌بینی «اگر امروز تحویل داده شود»
+              if (selectedProject.Status === "Active" && wage > 0) {
+                const factor = getTimeFactor(selectedProject, new Date());
+                const preview = calcMemberBonus(wage, factor, selectedProject.Manager_Score ?? 100);
+                const color = factor.percent > 0 ? "#16a34a" : factor.percent < 0 ? "#ef4444" : "#1d4ed8";
+                return (
+                  <div style={{ backgroundColor: "#f8fafc", padding: "14px", borderRadius: "10px", marginBottom: "24px", border: "1px dashed #cbd5e1" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                      <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>📊 پیش‌بینی پاداش شما (اگر امروز تحویل شود)</span>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color }}>{factor.reason}</span>
+                    </div>
+                    <p style={{ margin: "6px 0 0 0", fontSize: "18px", fontWeight: "bold", color }}>
+                      ≈ {preview.toLocaleString("fa-IR")} ریال
+                    </p>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
 
             {/* دکمه‌های وضعیت - فقط مسئول می‌تواند اتمام ثبت کند */}
             {selectedProject.Status === "Active" && (
@@ -607,14 +627,15 @@ export default function MyProjectsClient({
                   />
                   <button
                     type="submit"
+                    disabled={isSubmitting}
                     style={{
                       width: "100%",
                       padding: "12px",
-                      backgroundColor: "#16a34a",
+                      backgroundColor: isSubmitting ? "#94a3b8" : "#16a34a",
                       color: "white",
                       border: "none",
                       borderRadius: "10px",
-                      cursor: "pointer",
+                      cursor: isSubmitting ? "wait" : "pointer",
                       fontWeight: "bold",
                       fontSize: "14px",
                       display: "flex",
@@ -623,8 +644,7 @@ export default function MyProjectsClient({
                       gap: "8px",
                     }}
                   >
-                    <CheckCircle style={{ width: "18px", height: "18px" }} /> ثبت
-                    اتمام پروژه
+                    <CheckCircle style={{ width: "18px", height: "18px" }} /> {isSubmitting ? "در حال ارسال..." : "ثبت اتمام پروژه"}
                   </button>
                 </form>
               ) : (
@@ -711,7 +731,7 @@ export default function MyProjectsClient({
           }}
         >
           <CheckCircle
-            style={{ width: "20px", height: "20px", color: "#10b981" }}
+            style={{ width: "20px", height: "20px", color: toast.includes("خطا") ? "#f87171" : "#10b981" }}
           />
           {toast}
         </div>

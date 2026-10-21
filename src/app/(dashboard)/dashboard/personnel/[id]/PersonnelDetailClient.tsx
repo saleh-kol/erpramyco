@@ -112,7 +112,7 @@ const getStatusClass = (report: any) => {
   return "bg-orange-50 text-[#c6531c] border-orange-200";
 };
 
-export default function PersonnelDetailClient({ data, searchParams }: { data: any; searchParams: any }) {
+export default function PersonnelDetailClient({ data, searchParams, workTypes }: { data: any; searchParams: any; workTypes: any[] }) {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [startDateVal, setStartDateVal] = useState<any>(null);
@@ -124,6 +124,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
   const [modalScore, setModalScore] = useState<string>("100");
   const [modalDifficulty, setModalDifficulty] = useState<string>("1");
   const [modalComment, setModalComment] = useState<string>("");
+  const [modalWorkTypeId, setModalWorkTypeId] = useState<string>(""); // ✅ جدید: اصلاح نوع فعالیت
   const [actionType, setActionType] = useState<string>("approve");
   const [toast, setToast] = useState<string | null>(null);
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
@@ -171,6 +172,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
     setModalScore(report.Manager_Score !== null && report.Manager_Score !== undefined ? String(report.Manager_Score) : "100");
     setModalDifficulty(report.Difficulty !== null && report.Difficulty !== undefined ? String(report.Difficulty) : "1");
     setModalComment(report.Manager_Comment || "");
+    setModalWorkTypeId(report.Work_Type_ID ? String(report.Work_Type_ID) : ""); // ✅ جدید
     setActionType(report.Report_Status === "Rejected" ? "reject" : "approve");
   };
 
@@ -190,19 +192,26 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
 
   const showToast = (message: string) => { setToast(message); setTimeout(() => setToast(null), 3000); };
 
-  // اصلاح خطای سینتکس تابع toggleDay
   const toggleDay = (key: string) => {
     setExpandedDays((current) => ({ ...current, [key]: !current[key] }));
   };
 
+  // 🔧 فیکس: هندل خطا + رفرش (نوع فعالیت اصلاح‌شده در جدول و نمودار رندر شود)
   const handleReviewSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     formData.append("actionType", actionType);
     formData.append("currentPath", `/dashboard/personnel/${data.Personnel_ID}`);
-    await reviewReportAction(formData);
+
+    const result: any = await reviewReportAction(formData);
+    if (result?.error) {
+      showToast(`خطا: ${result.error}`);
+      return;
+    }
+
     setSelectedReport(null);
     showToast("گزارش با موفقیت بررسی شد");
+    router.refresh();
   };
 
   const handleMissionSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -213,6 +222,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
     await reviewMissionAction(formData);
     setSelectedMission(null);
     showToast("ماموریت با موفقیت بررسی شد");
+    router.refresh();
   };
 
   const handleProjectSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -223,6 +233,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
     await reviewProjectAction(formData);
     setSelectedProject(null);
     showToast("پروژه با موفقیت بررسی شد");
+    router.refresh();
   };
 
   const dateInputStyle: CSSProperties = { padding: "10px", borderRadius: "10px", border: "1px solid #cbd5e1", outline: "none", fontSize: "14px", fontFamily: "inherit", width: "160px", textAlign: "center", boxShadow: "none" };
@@ -257,7 +268,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
       `}</style>
 
       <div className="erp-page" style={{ maxWidth: "1500px", margin: "0 auto" }}>
-        {/* Header */}
+        {/* Header — دست نخورده */}
         <div className="box-card erp-header" style={{ padding: "24px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
             <button onClick={() => router.push("/dashboard/personnel")} style={{ border: "1px solid #e2e8f0", borderRadius: "12px", padding: "10px", cursor: "pointer", backgroundColor: "white" }}>
@@ -285,7 +296,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
           </div>
         </div>
 
-        {/* Date Filter */}
+        {/* Date Filter — دست نخورده */}
         <div className="box-card erp-filter" style={{ padding: "20px 24px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)", padding: "12px", borderRadius: "14px", border: "1px solid #fed7aa" }}>
@@ -312,7 +323,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
           </div>
         </div>
 
-        {/* Summary + Chart */}
+        {/* Summary + Chart — دست نخورده */}
         <div className="erp-summary-chart" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "20px", marginBottom: "20px" }}>
           <div className="box-card" style={{ background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 50%, #fff7ed 100%)", border: "1px solid #fed7aa", padding: "28px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
             <div style={{ background: "linear-gradient(135deg, #ed6e2b 0%, #ea580c 100%)", padding: "14px", borderRadius: "16px", marginBottom: "16px", boxShadow: "0 8px 16px -4px rgba(237, 110, 43, 0.3)" }}>
@@ -348,7 +359,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
           </div>
         </div>
 
-        {/* Main Grid */}
+        {/* Main Grid — دست نخورده */}
         <div className="erp-main-grid" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px" }}>
           {/* Activity Table */}
           <div className="box-card" style={{ padding: "24px" }}>
@@ -507,7 +518,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
             )}
           </div>
 
-          {/* Right Sidebar */}
+          {/* Right Sidebar — دست نخورده */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Tasks */}
             <div className="box-card" style={{ padding: "24px" }}>
@@ -620,7 +631,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
                 <div className="erp-data-box"><span className="erp-data-label">زمان واقعی محاسبه‌شده</span><span className="erp-data-value" style={{ color: "#ed6e2b" }}>{formatHoursAndMinutes(getActualHours(selectedReport))}</span></div>
                 <div className="erp-data-box"><span className="erp-data-label">ضریب فعلی مدیر</span><span className="erp-data-value">{getManagerScore(selectedReport)}٪</span></div>
                 <div className="erp-data-box"><span className="erp-data-label">ساعت موثر فعلی</span><span className="erp-data-value" style={{ color: "#ed6e2b" }}>{formatDecimalHours(getEffectiveHours(selectedReport))} ساعت</span></div>
-                <div className="erp-data-box"><span className="erp-data-label">نوع فعالیت</span><span className="erp-data-value">{selectedReport.PR_Work_Types?.Work_Type_Name || "-"}</span></div>
+                <div className="erp-data-box"><span className="erp-data-label">نوع فعالیت (ثبت کارمند)</span><span className="erp-data-value">{selectedReport.PR_Work_Types?.Work_Type_Name || "-"}</span></div>
                 <div className="erp-data-box" style={{ gridColumn: "1 / -1" }}><span className="erp-data-label">محل فعالیت</span><span className="erp-data-value">{selectedReport.PR_Work_Locations?.Location_Name || "-"}</span></div>
                 <div className="erp-data-box" style={{ gridColumn: "1 / -1" }}><span className="erp-data-label">شرح کار انجام شده</span><span className="erp-data-value" style={{ fontWeight: 500, lineHeight: "1.8" }}>{selectedReport.Work_Description || "توضیحاتی ثبت نشده است."}</span></div>
               </div>
@@ -628,7 +639,33 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
               <h3 className="erp-modal-section-title" style={{ borderTop: "1px solid #f1f5f9", paddingTop: "24px" }}>بررسی و تأیید توسط مدیر</h3>
               <form onSubmit={handleReviewSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <input type="hidden" name="reportId" value={selectedReport.Report_ID} />
-                
+
+                {/* ✅ اصلاح نوع فعالیت — منبع: تنظیمات فعالیت‌ها */}
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>
+                    نوع فعالیت
+                    <span style={{ fontSize: "11px", fontWeight: 400, color: "#94a3b8", marginRight: "6px" }}>
+                      (ثبت شده توسط کارمند: {selectedReport.PR_Work_Types?.Work_Type_Name || "نامشخص"})
+                    </span>
+                  </label>
+                  <select
+                    name="workTypeId"
+                    value={modalWorkTypeId}
+                    onChange={(e) => setModalWorkTypeId(e.target.value)}
+                    className="erp-input"
+                  >
+                    <option value="">— بدون تغییر —</option>
+                    {workTypes.map((wt: any) => (
+                      <option key={wt.Work_Type_ID} value={wt.Work_Type_ID}>
+                        {wt.Work_Type_Name}
+                      </option>
+                    ))}
+                  </select>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "11px", color: "#94a3b8" }}>
+                    اگر کارمند نوع فعالیت را اشتباه انتخاب کرده، از این لیست (تعریف‌شده در تنظیمات فعالیت‌ها) اصلاح کنید.
+                  </p>
+                </div>
+
                 <div>
                   <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#475569", marginBottom: "8px" }}>ضریب سختی کار</label>
                   <input type="number" name="difficulty" min="1" max="10" value={modalDifficulty} onChange={(e) => setModalDifficulty(e.target.value)} className="erp-input" />
@@ -668,7 +705,7 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
         </div>
       )}
 
-      {/* Mission Modal */}
+      {/* Mission Modal — دست نخورده */}
       {selectedMission && (
         <div className="erp-modal-overlay" onClick={() => setSelectedMission(null)}>
           <div className="erp-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -679,6 +716,9 @@ export default function PersonnelDetailClient({ data, searchParams }: { data: an
                   <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "bold", color: "#0f172a" }}>بررسی ماموریت</h2>
                   <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>{toPersianDate(selectedMission.Commute_Date)}</p>
                 </div>
+           
+
+              {/* ⬇️ بقیه مودال ماموریت — همان که داری بماند ⬇️ */}
               </div>
               <button type="button" className="erp-btn-close" onClick={() => setSelectedMission(null)}><X /></button>
             </div>

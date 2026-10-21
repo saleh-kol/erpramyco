@@ -1,69 +1,78 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateProjectAction, deleteProjectAction } from "@/actions/projectDetails";
 import {
-  ArrowRight, Save, CheckCircle, Trash2, AlertTriangle, X, Briefcase, Users, Crown, ChevronDown, ChevronUp, Layers, Award, TrendingUp, UserCircle2, Calendar, Wallet, Info
+  ArrowRight, Save, CheckCircle, Trash2, AlertTriangle, Briefcase, Users, Crown,
+  ChevronDown, ChevronUp, Layers, Award, UserCircle2, Calendar, Info, BadgeCheck,
 } from "lucide-react";
+import { getTimeFactor, calcMemberBonus } from "@/lib/project/bonus"; // ✅ منبع واحد پاداش
 
 const toPersianDate = (date: Date | string) => { if (!date) return "-"; const d = new Date(date); if (isNaN(d.getTime())) return "-"; return d.toLocaleDateString("fa-IR"); };
-const translateRole = (role: string) => { return role?.replace(/_/g, ' ') || "-"; };
 
 export default function ProjectDetailClient({ data }: { data: any }) {
   const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // استیت‌های قابل ویرایش توسط مدیر
   const [openPhaseId, setOpenPhaseId] = useState<number | null>(null);
   const [liveManagerScore, setLiveManagerScore] = useState<number>(data.Manager_Score || 100);
   const [liveStatus, setLiveStatus] = useState<string>(data.Status || "Active");
   const [liveComment, setLiveComment] = useState<string>(data.Manager_Comment || "");
 
-  // تابع محاسبه پاداش نهایی هر فرد (زنده)
+  const showToast = (msg: string, ms = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), ms);
+  };
+
+  // ============================================================
+  //  ✅ محاسبه پاداش هر عضو — دقیقاً هماهنگ با اکشن ذخیره
+  //  لحظه تحویل:
+  //   - پروژه از قبل Completed → Updated_At (لحظه واقعی اتمام)
+  //   - مدیر همین الان Completed را انتخاب کرده → الان (پیش‌نمایش)
+  // ============================================================
   const calculateBonus = (member: any) => {
     const baseWage = Number(member.Personnel_Wage || 0);
-    let calculatedBonus = baseWage;
-    let reason = "دستمزد پایه";
 
-    // ۱. محاسبه پاداش/جریمه زمانی (فقط اگر مدیر وضعیت را روی اتمام یافته بگذارد)
-    if (liveStatus === 'Completed' && data.End_Date) {
-      const endDate = new Date(data.End_Date).getTime();
-      const goldenDate = data.Golden_Date ? new Date(data.Golden_Date).getTime() : null;
-      const deadlineDate = data.Deadline_Date ? new Date(data.Deadline_Date).getTime() : null;
-
-      if (goldenDate && endDate <= goldenDate) {
-        const bonusPercent = Number(data.Golden_Bonus_Percent || 0) / 100;
-        calculatedBonus = baseWage + (baseWage * bonusPercent);
-        reason = `پاداش طلایی (+${data.Golden_Bonus_Percent}%)`;
-      } else if (deadlineDate && endDate > deadlineDate) {
-        const penaltyPercent = Number(data.Delay_Penalty_Percent || 0) / 100;
-        calculatedBonus = baseWage - (baseWage * penaltyPercent);
-        reason = `جریمه دیرکرد (-${data.Delay_Penalty_Percent}%)`;
-      } else {
-        reason = "تحویل در زمان عادی";
-      }
+    if (liveStatus === "Completed") {
+      const delivery =
+        data.Status === "Completed" && data.Updated_At
+          ? new Date(data.Updated_At) // اتمام واقعی قبلی
+          : new Date();               // پیش‌نمایش تحویل امروز
+      const factor = getTimeFactor(data, delivery);
+      const finalBonus = calcMemberBonus(baseWage, factor, liveManagerScore);
+      return { finalBonus, reason: `${factor.reason} × ضریب مدیر (${liveManagerScore}%)`, kind: factor.kind };
     }
 
-    // ۲. اعمال ضریب رضایت مدیر
-    const managerScore = Number(liveManagerScore || 100) / 100;
-    const finalBonus = calculatedBonus * managerScore;
-
-    return { finalBonus: Math.round(finalBonus), reason: `${reason} × ضریب مدیر (${liveManagerScore}%)` };
+    return { finalBonus: Math.round(baseWage), reason: "دستمزد پایه (پروژه در حال انجام)", kind: null };
   };
+
+  // آیا پیش‌نمایش فعلی «گذشته از حد نهایی» است؟
+  const isExpiredPreview = liveStatus === "Completed" &&
+    calculateBonus({ Personnel_Wage: 1 }).kind === "expired";
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
     const formData = new FormData();
-    formData.append('projectId', String(data.Project_ID));
-    formData.append('managerScore', String(liveManagerScore));
-    formData.append('status', liveStatus);
-    formData.append('managerComment', liveComment);
+    formData.append("projectId", String(data.Project_ID));
+    formData.append("managerScore", String(liveManagerScore));
+    formData.append("status", liveStatus);
+    formData.append("managerComment", liveComment);
 
-    await updateProjectAction(formData);
-    setToast("تغییرات با موفقیت ذخیره شد");
-    setTimeout(() => setToast(null), 3000);
+    // ✅ فیکس: هندل خطا + رفرش تا پاداش ذخیره‌شده اعضا نمایش داده شود
+    const result: any = await updateProjectAction(formData);
+    setIsSubmitting(false);
+
+    if (result?.error) {
+      showToast(`خطا: ${result.error}`, 5000);
+      return;
+    }
+    showToast("تغییرات با موفقیت ذخیره شد");
+    router.refresh();
   };
 
   const handleDelete = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -71,10 +80,10 @@ export default function ProjectDetailClient({ data }: { data: any }) {
     const formData = new FormData(e.currentTarget);
     const result: any = await deleteProjectAction(formData);
     if (result?.success) {
-      setShowDeleteModal(false); setToast("پروژه با موفقیت حذف شد"); 
+      setShowDeleteModal(false); showToast("پروژه با موفقیت حذف شد");
       setTimeout(() => { router.push("/dashboard/projects"); }, 2000);
     } else {
-      setShowDeleteModal(false); setToast(result?.error || "خطا در حذف پروژه"); setTimeout(() => setToast(null), 5000);
+      setShowDeleteModal(false); showToast(result?.error || "خطا در حذف پروژه", 5000);
     }
   };
 
@@ -97,7 +106,7 @@ export default function ProjectDetailClient({ data }: { data: any }) {
         @keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
       `}</style>
 
-      {/* هدر صفحه */}
+      {/* هدر صفحه — دست نخورده */}
       <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "20px 24px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <button onClick={() => router.push("/dashboard/projects")} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", padding: "8px", cursor: "pointer", backgroundColor: "white" }}>
@@ -116,10 +125,9 @@ export default function ProjectDetailClient({ data }: { data: any }) {
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px", alignItems: "start" }}>
         
-        {/* ستون راست: اطلاعات ثابت پروژه و فازها */}
+        {/* ستون راست: اطلاعات ثابت پروژه و فازها — دست نخورده */}
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           
-          {/* اطلاعات پایه پروژه (فقط خواندنی) */}
           <div style={cardStyle}>
             <h2 style={{ ...headerStyle, marginBottom: "20px" }}><div style={{ width: "4px", height: "20px", backgroundColor: "#ed6e2b", borderRadius: "2px" }}></div> اطلاعات پروژه</h2>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
@@ -138,7 +146,7 @@ export default function ProjectDetailClient({ data }: { data: any }) {
             </div>
           </div>
 
-          {/* فازهای پروژه (آکاردئون) */}
+          {/* فازهای پروژه (آکاردئون) — دست نخورده */}
           <div style={cardStyle}>
             <h2 style={headerStyle}><div style={{ width: "4px", height: "20px", backgroundColor: "#ed6e2b", borderRadius: "2px" }}></div> فازهای پروژه ({data.PR_Project_Phases?.length || 0})</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -217,18 +225,26 @@ export default function ProjectDetailClient({ data }: { data: any }) {
               <textarea value={liveComment} onChange={(e) => setLiveComment(e.target.value)} rows={3} className="erp-input" style={{ ...inputStyle, resize: "vertical" }} placeholder="نظر خود را وارد کنید..."></textarea>
             </div>
 
-            <button type="submit" className="erp-btn-submit" style={{ width: "100%", justifyContent: "center" }}>
-              <Save style={{ width: "18px", height: "18px" }} /> ثبت نهایی ارزیابی
+            {/* ✅ هشدار گذشته از حد نهایی — قبل از ثبت دیده شود */}
+            {isExpiredPreview && (
+              <div style={{ marginBottom: "16px", backgroundColor: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", padding: "12px", fontSize: "12px", color: "#991b1b", fontWeight: 600, lineHeight: 1.6 }}>
+                ⚠️ امروز از تاریخ حد نهایی گذشته است. با ثبت «اتمام یافته»، جریمه دیرکرد روی پاداش همه اعضا اعمال می‌شود. (تایید رسمی درخواست اتمام، پروژه را لغو می‌کند)
+              </div>
+            )}
+
+            <button type="submit" disabled={isSubmitting} className="erp-btn-submit" style={{ width: "100%", justifyContent: "center", opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? "wait" : "pointer" }}>
+              <Save style={{ width: "18px", height: "18px" }} /> {isSubmitting ? "در حال ذخیره..." : "ثبت نهایی ارزیابی"}
             </button>
           </div>
 
-          {/* باکس اعضای پروژه و محاسبه پاداش زنده */}
+          {/* باکس اعضای پروژه و محاسبه پاداش زنده — ✅ هماهنگ با اکشن */}
           <div style={cardStyle}>
             <h2 style={headerStyle}><div style={{ width: "4px", height: "20px", backgroundColor: "#ed6e2b", borderRadius: "2px" }}></div> پاداش تیم (محاسبه زنده)</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {data.PR_Project_Assignments?.map((pa: any) => {
                 const bonus = calculateBonus(pa);
                 const isProfit = bonus.finalBonus > Number(pa.Personnel_Wage || 0);
+                const hasSavedBonus = data.Status === "Completed" && pa.Final_Bonus != null;
                 return (
                   <div key={pa.Assignment_ID} style={{ backgroundColor: "#f8fafc", padding: "12px", borderRadius: "10px", border: "1px solid #f1f5f9" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
@@ -237,13 +253,19 @@ export default function ProjectDetailClient({ data }: { data: any }) {
                         <p style={{ margin: 0, fontWeight: "bold", fontSize: "14px", color: "#0f172a" }}>{pa.Personnel?.Full_Name}</p>
                         <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>پایه: {Number(pa.Personnel_Wage || 0).toLocaleString('fa-IR')} ریال</p>
                       </div>
+                      {/* ✅ نشان پاداش ذخیره‌شده */}
+                      {hasSavedBonus && (
+                        <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", fontWeight: 700, color: "#166534", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", padding: "3px 8px", borderRadius: "6px", flexShrink: 0 }}>
+                          <BadgeCheck style={{ width: "12px", height: "12px" }} /> ثبت شده
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "white", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        <Info style={{ width: "14px", height: "14px", color: "#64748b" }} />
+                        <Info style={{ width: "14px", height: "14px", color: "#64748b", flexShrink: 0 }} />
                         <span style={{ fontSize: "10px", color: "#64748b", lineHeight: 1.4 }}>{bonus.reason}</span>
                       </div>
-                      <span style={{ fontSize: "14px", fontWeight: "bold", color: isProfit ? "#16a34a" : "#ef4444" }}>
+                      <span style={{ fontSize: "14px", fontWeight: "bold", color: isProfit ? "#16a34a" : bonus.finalBonus < Number(pa.Personnel_Wage || 0) ? "#ef4444" : "#334155" }}>
                         {bonus.finalBonus.toLocaleString('fa-IR')} ریال
                       </span>
                     </div>
@@ -256,7 +278,7 @@ export default function ProjectDetailClient({ data }: { data: any }) {
         </div>
       </form>
 
-      {/* مودال تایید حذف */}
+      {/* مودال تایید حذف — دست نخورده */}
       {showDeleteModal && (
         <div className="erp-modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="erp-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -278,7 +300,7 @@ export default function ProjectDetailClient({ data }: { data: any }) {
 
       {toast && (
         <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#0f172a', color: 'white', padding: '12px 24px', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)', zIndex: 100, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500, animation: 'slideUp 0.3s ease-out' }}>
-          <CheckCircle style={{ width: '20px', height: '20px', color: '#10b981' }} />{toast}
+          <CheckCircle style={{ width: '20px', height: '20px', color: toast.includes("خطا") ? '#f87171' : '#10b981' }} />{toast}
         </div>
       )}
     </div>

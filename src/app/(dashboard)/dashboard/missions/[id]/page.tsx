@@ -1,13 +1,13 @@
-import { getMissionDetails } from "@/actions/missions";
+import { getMissionDetails, checkMissionPermissions } from "@/actions/missions";
 import MissionDetailClient from "./MissionDetailClient";
+
+export const dynamic = "force-dynamic";
 
 export default async function MissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  
-  // این تابع خودش اطلاعات پرسنل، جایگاه و واحد را هم می‌گیرد
-  const data = await getMissionDetails(id);
+  const [data, perms] = await Promise.all([getMissionDetails(id), checkMissionPermissions()]);
 
-  if (!data) return <div style={{ padding: "24px" }}>ماموریت یافت نشد</div>;
+  if (!data) return <div style={{ padding: "24px" }}>ماموریت یافت نشد یا دسترسی ندارید</div>;
 
-  return <MissionDetailClient data={data} />;
+  return <MissionDetailClient data={data} canReview={perms.canReview} />;
 }

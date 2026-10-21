@@ -5,313 +5,253 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { verifySession } from "@/lib/session";
 
-/**
- * دریافت جزئیات پرسنل
- */
-export async function getPersonnelDetails(
-  id: string,
-  startDate?: string,
-  endDate?: string
-) {
-  const personnelId = Number(id);
-
-  if (!Number.isInteger(personnelId)) {
-    throw new Error("شناسه پرسنل نامعتبر است");
-  }
-
-  let end = new Date();
-  let start = new Date();
-
-  start.setDate(start.getDate() - 7);
-
-  if (startDate) {
-    const parsedStart = new Date(`${startDate}T00:00:00.000Z`);
-
-    if (!Number.isNaN(parsedStart.getTime())) {
-      start = parsedStart;
-    }
-  }
-
-  if (endDate) {
-    const parsedEnd = new Date(`${endDate}T23:59:59.999Z`);
-
-    if (!Number.isNaN(parsedEnd.getTime())) {
-      end = parsedEnd;
-    }
-  }
-
-  const personnel = await prisma.personnel.findUnique({
-    where: {
-      Personnel_ID: personnelId,
-    },
-
-    include: {
-      OrganizationalPosition: true,
-      Unit: true,
-
-      PR_Daily_Reports_PR_Daily_Reports_Personnel_IDToPersonnel: {
-        where: {
-          Report_Date: {
-            gte: start,
-            lte: end,
-          },
-        },
-
-        orderBy: {
-          Report_Date: "desc",
-        },
-
-        include: {
-          PR_Work_Types: true,
-          PR_Projects: true,
-          PR_Work_Locations: true,
-        },
-      },
-
-      PR_Commute_Logs_PR_Commute_Logs_Personnel_IDToPersonnel: {
-        where: {
-          Commute_Date: {
-            gte: start,
-            lte: end,
-          },
-        },
-
-        orderBy: {
-          Commute_Date: "desc",
-        },
-      },
-
-      PR_Project_Assignments: {
-        where: {
-          Is_Active: true,
-        },
-
-        include: {
-          PR_Projects: true,
-        },
-      },
-
-      Tasks_AssignedTo: {
-        orderBy: {
-          Created_At: "desc",
-        },
-
-        take: 5,
-      },
-    },
-  });
-
-  return JSON.parse(JSON.stringify(personnel));
+// ============================================================
+//  ابزارهای مشترک
+// ============================================================
+async function getSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("session")?.value;
+  if (!token) return null;
+  return await verifySession(token);
 }
 
-/**
- * فعال / غیرفعال کردن پرسنل
- */
-export async function togglePersonnelStatus(formData: FormData) {
-  const idValue = formData.get("id");
-  const isActiveValue = formData.get("isActive");
+/** User_ID نشست → Personnel_ID (Manager_ID به جدول Personnel ارجاع دارد) */
+async function getCurrentPersonnelId(): Promise<number | null> {
+  const user = await getSession();
+  if (!user) return null;
+  const dbUser = await prisma.users.findUnique({
+    where: { User_ID: user.userId },
+    select: { Personnel_ID: true },
+  });
+  return dbUser?.Personnel_ID ?? null;
+}
 
-  const id = Number(idValue);
+/** مسیر برگشت امن — currentPath از فرم می‌آید، در غیر اینصورت fallback */
+function revalidateTarget(currentPath: FormDataEntryValue | null, fallback: string) {
+  revalidatePath(typeof currentPath === "string" && currentPath.startsWith("/") ? currentPath : fallback);
+}
 
-  if (!Number.isInteger(id)) {
-    throw new Error("شناسه پرسنل نامعتبر است");
-  }
-
-  const currentStatus = isActiveValue === "true";
+// ============================================================
+//  ۱. فعال/غیرفعال کردن پرسنل (مستقیم به‌عنوان form action)
+// ============================================================
+export async function togglePersonnelStatus(formData: FormData): Promise<void> {
+  const id = parseInt(formData.get("id") as string);
+  const isActive = formData.get("isActive") === "true";
+  if (isNaN(id)) return;
 
   await prisma.personnel.update({
-    where: {
-      Personnel_ID: id,
-    },
-
-    data: {
-      IsActive: !currentStatus,
-    },
+    where: { Personnel_ID: id },
+    data: { IsActive: !isActive },
   });
 
   revalidatePath(`/dashboard/personnel/${id}`);
+  revalidatePath("/dashboard/personnel");
 }
 
-// ۳. اکشن تایید/رد گزارش توسط مدیر
-export async function reviewReportAction(formData: FormData): Promise<void> {
-  const reportId = parseInt(formData.get('reportId') as string);
-  const actionType = formData.get('actionType') as string;
-  const scoreStr = formData.get('score') as string;
-  const difficulty = formData.get('difficulty') as string; 
-  const comment = formData.get('comment') as string;
+// ============================================================
+//  ۲. جزئیات کامل پرسنل — صفحه /dashboard/personnel/[id]
+//  (start/end اختیاری: بازه فیلتر ISO "YYYY-MM-DD")
+// ============================================================
+export async function getPersonnelDetails(id: string, start?: string, end?: string) {
+  const personnelId = parseInt(id);
+  if (isNaN(personnelId)) return null;
 
-  // اصلاح شد: استفاده از Manager_Reviewed به جای Approved
-  const newStatus = actionType === 'approve' ? 'Manager_Reviewed' : 'Rejected';
-  
-  try {
-    // ۱. دریافت اطلاعات فعلی گزارش برای محاسبه ساعت موثر
-    const report = await prisma.pR_Daily_Reports.findUnique({
-      where: { Report_ID: reportId },
-      select: { Work_Hours: true }
+  // ساخت فیلتر بازه — نیمه‌شب تا آخر شب
+  const dateFilter: any = {};
+  if (start) {
+    const d = new Date(`${start}T00:00:00`);
+    if (!isNaN(d.getTime())) dateFilter.gte = d;
+  }
+  if (end) {
+    const d = new Date(`${end}T23:59:59`);
+    if (!isNaN(d.getTime())) dateFilter.lte = d;
+  }
+  const hasRange = Object.keys(dateFilter).length > 0;
+
+  const personnel = await prisma.personnel.findUnique({
+    where: { Personnel_ID: personnelId },
+    include: {
+      Production_Lines: true,
+      OrganizationalPosition: true,
+      Unit: true,
+      // گزارش‌های روزانه — کلید رابطه دقیقاً مطابق UI کلاینت
+      PR_Daily_Reports_PR_Daily_Reports_Personnel_IDToPersonnel: {
+        where: hasRange ? { Report_Date: dateFilter } : undefined,
+        include: { PR_Work_Types: true, PR_Work_Locations: true, PR_Projects: true },
+        orderBy: [{ Report_Date: "desc" }, { Check_In: "desc" }],
+      },
+      // ماموریت‌ها
+      PR_Commute_Logs_PR_Commute_Logs_Personnel_IDToPersonnel: {
+        where: hasRange ? { Commute_Date: dateFilter } : undefined,
+        orderBy: { Commute_Date: "desc" },
+      },
+      // پروژه‌ها
+      PR_Project_Assignments: {
+        include: { PR_Projects: { include: { Project_Leader: true } } },
+        orderBy: { Assigned_From: "desc" },
+      },
+      // ابلاغیه‌ها
+      Tasks_AssignedTo: {
+        orderBy: { Created_At: "desc" },
+        take: 10,
+      },
+    },
+  });
+
+  if (!personnel) return null;
+  return JSON.parse(JSON.stringify(personnel));
+}
+
+// ============================================================
+//  ۳. بررسی گزارش روزانه (تایید/رد + ضریب + سختی + نظر + ✅ اصلاح نوع فعالیت)
+// ============================================================
+export async function reviewReportAction(formData: FormData) {
+  const reportId = parseInt(formData.get("reportId") as string);
+  const actionType = formData.get("actionType") as string; // "approve" | "reject"
+  const score = formData.get("score") as string;
+  const difficulty = formData.get("difficulty") as string;
+  const comment = formData.get("comment") as string;
+  const workTypeId = formData.get("workTypeId") as string; // ✅ جدید: اصلاح نوع فعالیت
+  const currentPath = formData.get("currentPath");
+
+  if (isNaN(reportId)) return { error: "شناسه گزارش نامعتبر است" };
+  if (actionType !== "approve" && actionType !== "reject") return { error: "عملیات نامعتبر است" };
+
+  const managerId = await getCurrentPersonnelId();
+  if (!managerId) return { error: "نشست نامعتبر است" };
+
+  // ✅ اعتبارسنجی نوع فعالیت: فقط اگر ارسال شده، باید فعال و موجود باشد
+  let newWorkTypeId: number | undefined = undefined;
+  if (workTypeId && workTypeId.trim() !== "") {
+    const parsed = parseInt(workTypeId);
+    if (isNaN(parsed)) return { error: "نوع فعالیت نامعتبر است" };
+
+    const workType = await prisma.pR_Work_Types.findFirst({
+      where: { Work_Type_ID: parsed, Is_Active: true },
+      select: { Work_Type_ID: true },
     });
+    if (!workType) return { error: "نوع فعالیت انتخاب‌شده یافت نشد یا غیرفعال است" };
 
-    const workHours = Number(report?.Work_Hours || 0);
-    const managerScore = scoreStr ? parseFloat(scoreStr) : 100;
-    
-    // ۲. محاسبه ساعت موثر (Effective Hours)
-    const effectiveHours = workHours * (managerScore / 100);
-
-    // ۳. آپدیت دیتابیس با فیلد جدید Effective_Hours
-    await prisma.pR_Daily_Reports.update({
-      where: { Report_ID: reportId },
-      data: {
-        Report_Status: newStatus,
-        Manager_Score: managerScore,
-        Difficulty: difficulty ? parseFloat(difficulty) : 1,
-        Manager_Comment: comment || null,
-        Effective_Hours: effectiveHours, // ذخیره ساعت موثر برای کش شدن و افزایش سرعت کوئری‌ها
-        Reviewed_At: new Date()
-      }
-    })
-  } catch (error: any) {
-    console.error("خطا در ثبت بررسی:", error.message)
+    newWorkTypeId = parsed;
   }
 
-  const currentPath = formData.get('currentPath') as string || '/dashboard/personnel';
-  revalidatePath(currentPath);
+  await prisma.pR_Daily_Reports.update({
+    where: { Report_ID: reportId },
+    data: {
+      Report_Status: (actionType === "reject" ? "Rejected" : "Manager_Reviewed") as any,
+      Manager_Score: score ? Math.max(0, Math.min(100, parseFloat(score))) : null,
+      Difficulty: difficulty ? parseFloat(difficulty) : undefined,
+      Manager_Comment: comment || null,
+      Manager_ID: managerId,
+      Reviewed_At: new Date(),
+      // ✅ فقط اگر مدیر نوع جدیدی انتخاب کرده باشد — وگرنه دست‌نخورده
+      ...(newWorkTypeId !== undefined ? { Work_Type_ID: newWorkTypeId } : {}),
+    },
+  });
+
+  revalidateTarget(currentPath, "/dashboard/leave-approvals");
+  return { success: true };
 }
 
+// ============================================================
+//  ۴. بررسی ماموریت — منطق چرخه حیات ماموریت‌ها (هماهنگ با ماژول ماموریت)
+//  approve: Completed → تایید نهایی | غیر آن → InProgress
+//  reject:  → Rejected
+// ============================================================
+export async function reviewMissionAction(formData: FormData) {
+  // پذیرش هر دو نام فیلد (بسته به hidden input مودال)
+  const idRaw = (formData.get("commuteId") || formData.get("missionId")) as string;
+  const commuteId = parseInt(idRaw as string);
+  const actionType = formData.get("actionType") as string;
+  const score = formData.get("score") as string;
+  const comment = formData.get("comment") as string;
+  const currentPath = formData.get("currentPath");
 
- // تایید / رد ماموریت توسط مدیر
-export async function reviewMissionAction(
-  formData: FormData
-): Promise<void> {
-  const commuteIdValue = formData.get("commuteId");
+  if (isNaN(commuteId)) return { error: "شناسه ماموریت نامعتبر است" };
+  if (actionType !== "approve" && actionType !== "reject") return { error: "عملیات نامعتبر است" };
 
-  if (!commuteIdValue) {
-    throw new Error("شناسه ماموریت ارسال نشده است");
-  }
+  const managerId = await getCurrentPersonnelId();
+  if (!managerId) return { error: "نشست نامعتبر است" };
 
-  const commuteId = Number(commuteIdValue);
+  const mission = await prisma.pR_Commute_Logs.findUnique({ where: { Commute_ID: commuteId } });
+  if (!mission) return { error: "ماموریت یافت نشد" };
 
-  if (!Number.isInteger(commuteId)) {
-    throw new Error("شناسه ماموریت نامعتبر است");
-  }
+  let finalStatus = mission.Status || "InProgress";
+  let finalIsApproved = mission.Is_Approved ?? false;
 
-  const actionType = String(formData.get("actionType") ?? "");
-  const scoreValue = String(formData.get("score") ?? "");
-  const commentValue = String(formData.get("comment") ?? "");
-
-  const cookieStore = await cookies();
-  const session = cookieStore.get("session")?.value;
-
-  let managerId: number | null = null;
-
-  if (session) {
-    const user = await verifySession(session);
-
-    if (user?.userId != null) {
-      managerId = Number(user.userId);
+  if (actionType === "approve") {
+    if (mission.Status === "Completed") {
+      finalIsApproved = true; // ارزیابی نهایی
+    } else {
+      finalStatus = "InProgress"; // شروع ماموریت
     }
+  } else {
+    finalStatus = "Rejected";
+    finalIsApproved = false;
   }
 
-  try {
-    await prisma.pR_Commute_Logs.update({
-      where: {
-        Commute_ID: commuteId,
-      },
+  await prisma.pR_Commute_Logs.update({
+    where: { Commute_ID: commuteId },
+    data: {
+      Status: finalStatus,
+      Is_Approved: finalIsApproved,
+      Manager_Score: score ? Math.max(0, Math.min(100, parseFloat(score))) : null,
+      Manager_Comment: comment || null,
+      Manager_ID: managerId,
+      Approved_By: managerId,
+      Approved_At: new Date(),
+    },
+  });
 
-      data: {
-        Is_Approved: actionType === "approve",
-
-        Approved_By: managerId,
-
-        Approved_At: new Date(),
-
-        Manager_Score: scoreValue
-          ? parseFloat(scoreValue)
-          : null,
-
-        Manager_Comment: commentValue || null,
-
-        Manager_ID: managerId,
-      },
-    });
-  } catch (error: unknown) {
-    console.error(
-      "خطا در بررسی ماموریت:",
-      error instanceof Error ? error.message : error
-    );
-  }
-
-  const currentPath =
-    String(formData.get("currentPath") ?? "") ||
-    "/dashboard/personnel";
-
-  revalidatePath(currentPath);
+  revalidateTarget(currentPath, "/dashboard/missions");
+  revalidatePath("/dashboard/my-missions");
+  return { success: true };
 }
 
-/**
- * تایید / رد پروژه توسط مدیر
- */
-export async function reviewProjectAction(
-  formData: FormData
-): Promise<void> {
-  const projectIdValue = formData.get("projectId");
+// ============================================================
+//  ۵. ارزیابی پروژه از صفحه پرسنل
+//  approve: ذخیره ضریب/نظر/ارزیاب روی پروژه
+//  reject:  ذخیره ارزیابی + بازگشت پروژه OnHold به Active (رد درخواست اتمام)
+// ============================================================
+export async function reviewProjectAction(formData: FormData) {
+  const actionType = formData.get("actionType") as string;
+  const score = formData.get("score") as string;
+  const comment = formData.get("comment") as string;
+  const currentPath = formData.get("currentPath");
 
-  if (!projectIdValue) {
-    throw new Error("شناسه پروژه ارسال نشده است");
-  }
+  // پذیرش هر دو نام فیلد: projectId یا assignmentId
+  let projectId: number | null = null;
+  const projectIdRaw = formData.get("projectId");
+  const assignmentIdRaw = formData.get("assignmentId");
 
-  const projectId = Number(projectIdValue);
-
-  if (!Number.isInteger(projectId)) {
-    throw new Error("شناسه پروژه نامعتبر است");
-  }
-
-  const actionType = String(formData.get("actionType") ?? "");
-  const scoreValue = String(formData.get("score") ?? "");
-  const commentValue = String(formData.get("comment") ?? "");
-
-  const cookieStore = await cookies();
-  const session = cookieStore.get("session")?.value;
-
-  let managerId: number | null = null;
-
-  if (session) {
-    const user = await verifySession(session);
-
-    if (user?.userId != null) {
-      managerId = Number(user.userId);
-    }
-  }
-
-  try {
-    await prisma.pR_Projects.update({
-      where: {
-        Project_ID: projectId,
-      },
-
-      data: {
-        Manager_Score: scoreValue
-          ? parseFloat(scoreValue)
-          : null,
-
-        Manager_Comment: commentValue || null,
-
-        Manager_ID: managerId,
-
-        Status:
-          actionType === "approve"
-            ? "Active"
-            : "OnHold",
-      },
+  if (projectIdRaw) {
+    projectId = parseInt(projectIdRaw as string);
+  } else if (assignmentIdRaw) {
+    const assignment = await prisma.pR_Project_Assignments.findUnique({
+      where: { Assignment_ID: parseInt(assignmentIdRaw as string) },
+      select: { Project_ID: true },
     });
-  } catch (error: unknown) {
-    console.error(
-      "خطا در بررسی پروژه:",
-      error instanceof Error ? error.message : error
-    );
+    projectId = assignment?.Project_ID ?? null;
   }
 
-  const currentPath =
-    String(formData.get("currentPath") ?? "") ||
-    "/dashboard/personnel";
+  if (projectId === null || isNaN(projectId)) return { error: "شناسه پروژه نامعتبر است" };
+  if (actionType !== "approve" && actionType !== "reject") return { error: "عملیات نامعتبر است" };
 
-  revalidatePath(currentPath);
+  const managerId = await getCurrentPersonnelId();
+  if (!managerId) return { error: "نشست نامعتبر است" };
+
+  await prisma.pR_Projects.update({
+    where: { Project_ID: projectId },
+    data: {
+      Manager_Score: score ? Math.max(0, Math.min(100, parseFloat(score))) : null,
+      Manager_Comment: comment || null,
+      Manager_ID: managerId,
+      // رد کردن از صفحه پرسنل = بازگشت درخواست اتمام (در صورت وجود)
+      ...(actionType === "reject" ? { Status: "Active" } : {}),
+    },
+  });
+
+  revalidateTarget(currentPath, "/dashboard/projects");
+  revalidatePath("/dashboard/my-projects");
+  return { success: true };
 }

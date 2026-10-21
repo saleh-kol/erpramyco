@@ -178,12 +178,27 @@ model PR_Commute_Logs {
   Manager_Score                                     Decimal?                      @db.Decimal(5, 2)
   Manager_Comment                                   String?                       @db.VarChar(500)
   Manager_ID                                        Int?
+  Mission_Report                                    String?                       @db.VarChar(1000)
+  Mission_Attachments PR_Mission_Attachments[]
   Personnel_PR_Commute_Logs_Approved_ByToPersonnel  Personnel?                    @relation("PR_Commute_Logs_Approved_ByToPersonnel", fields: [Approved_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Commute_Approver")
   Personnel_PR_Commute_Logs_Personnel_IDToPersonnel Personnel                     @relation("PR_Commute_Logs_Personnel_IDToPersonnel", fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Commute_Personnel")
 
   @@index([Approved_By], map: "IX_PR_Commute_Approver")
   @@index([Commute_Date], map: "IX_PR_Commute_Date")
   @@index([Personnel_ID], map: "IX_PR_Commute_Personnel")
+}
+
+model PR_Mission_Attachments {
+  Attachment_ID Int      @id @default(autoincrement())
+  Commute_ID    Int
+  File_Name     String   @db.VarChar(255) // نام اصلی فایل (برای نمایش)
+  File_Path     String   @db.VarChar(500) // مسیر ذخیره روی سرور
+  File_Size     Int      @default(0)      // حجم به بایت
+  File_Type     String?  @db.VarChar(100) // MIME type
+  Uploaded_At   DateTime @default(now()) @db.DateTime(0)
+  PR_Commute_Logs PR_Commute_Logs @relation(fields: [Commute_ID], references: [Commute_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Mission_Attachment_Commute")
+
+  @@index([Commute_ID], map: "IX_Mission_Attachment_Commute")
 }
 
 model PR_Daily_Reports {
@@ -292,6 +307,10 @@ model PR_Monthly_Salary {
   Personnel_ID                                        Int
   Salary_Year                                         Int
   Salary_Month                                        Int
+  Accountant_ID                                        Int?
+  Accountant_At                                        DateTime?                   @db.DateTime(0)
+  Reject_Reason                                        String?                     @db.VarChar(500)
+  Personnel_PR_Monthly_Salary_Accountant_IDToPersonnel Personnel?                  @relation("PR_Monthly_Salary_Accountant_IDToPersonnel", fields: [Accountant_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Salary_Accountant")
   Total_Work_Hours                                    Decimal?                    @default(0.00) @db.Decimal(8, 2)
   Total_Overtime_Hours                                Decimal?                    @default(0.00) @db.Decimal(8, 2)
   Total_OffHours_Hours                                Decimal?                    @default(0.00) @db.Decimal(8, 2)
@@ -325,6 +344,7 @@ model PR_Monthly_Salary {
   @@unique([Personnel_ID, Salary_Year, Salary_Month], map: "UK_Salary_Personnel_Month")
   @@index([Approved_By], map: "IX_PR_Salary_Approver")
   @@index([Status], map: "IX_PR_Salary_Status")
+  @@index([Accountant_ID], map: "IX_PR_Salary_Accountant")
 }
 
 model PR_Monthly_Salary_Details {
@@ -334,6 +354,8 @@ model PR_Monthly_Salary_Details {
   Deduction_Type_ID  Int?
   Bonus_Type_ID      Int?
   Amount             Decimal                               @default(0.00) @db.Decimal(18, 2)
+  Is_Manual       Boolean  @default(false)
+  Original_Amount Decimal? @db.Decimal(18, 2)
   Description        String?                               @db.VarChar(255)
   Created_At         DateTime?                             @default(now()) @db.DateTime(0)
   PR_Bonus_Types     PR_Bonus_Types?                       @relation(fields: [Bonus_Type_ID], references: [Bonus_Type_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_SalaryDetail_Bonus")
@@ -346,44 +368,58 @@ model PR_Monthly_Salary_Details {
 }
 
 model PR_Personnel_Finance {
-  Finance_ID                                             Int        @id @default(autoincrement())
-  Personnel_ID                                           Int
-  Effective_From                                         DateTime   @db.Date
-  Effective_To                                           DateTime?  @db.Date
-  Base_Hourly_Rate                                       Decimal    @default(0.00) @db.Decimal(18, 2)
-  Overtime_Multiplier                                    Decimal    @default(1.40) @db.Decimal(5, 2)
-  OffHours_Multiplier                                    Decimal    @default(1.80) @db.Decimal(5, 2)
-  Min_Weekly_Hours                                       Decimal    @default(44.00) @db.Decimal(5, 2)
-  Max_Weekly_Overtime                                    Decimal    @default(20.00) @db.Decimal(5, 2)
-  // اصلاح ۱: مقادیر پیش‌فرض 0 به null تغییر یافتند تا از تنظیمات کلی ارث‌بری کنند
-  Holiday_Hour_Multiplier     Decimal?                   @db.Decimal(5, 2)
-  Friday_Hour_Multiplier      Decimal?                   @db.Decimal(5, 2)
-  Mission_Regular_Multiplier  Decimal?                   @db.Decimal(5, 2)
-  Mission_Friday_Multiplier   Decimal?                   @db.Decimal(5, 2)
-  Mission_Holiday_Multiplier  Decimal?                   @db.Decimal(5, 2)
-  Commute_Amount                                         Decimal?   @default(0.00) @db.Decimal(18, 2)
-  Mission_Daily_Amount                                   Decimal?   @default(0.00) @db.Decimal(18, 2)
-  Currency                                               String?    @default("IRR") @db.VarChar(10)
-  Base_Monthly_Salary                                    Decimal    @default(0) @db.Decimal(18, 2)
-  Housing_Allowance                                      Decimal    @default(0) @db.Decimal(18, 2)
-  Food_Allowance                                         Decimal    @default(0) @db.Decimal(18, 2)
-  Child_Allowance                                        Decimal    @default(0) @db.Decimal(18, 2)
-  Is_Active                                              Boolean?   @default(true)
-  Week1_Max_Hours             Decimal?                   @db.Decimal(5, 2)
-  Week1_Max_Overtime          Decimal?                   @db.Decimal(5, 2)
-  Week2_Max_Hours             Decimal?                   @db.Decimal(5, 2)
-  Week2_Max_Overtime          Decimal?                   @db.Decimal(5, 2)
-  Week3_Max_Hours             Decimal?                   @db.Decimal(5, 2)
-  Week3_Max_Overtime          Decimal?                   @db.Decimal(5, 2)
-  Week4_Max_Hours             Decimal?                   @db.Decimal(5, 2)
-  Week4_Max_Overtime          Decimal?                   @db.Decimal(5, 2)
-  MonthEnd_Max_Hours          Decimal?                   @db.Decimal(5, 2)
-  MonthEnd_Max_Overtime       Decimal?                   @db.Decimal(5, 2)
-  Max_Friday_Hours_Month      Decimal?                   @db.Decimal(5, 2)
-  Max_Holiday_Hours_Month     Decimal?                   @db.Decimal(5, 2)
-  Created_By                                             Int?
-  Created_At                                             DateTime?  @default(now()) @db.DateTime(0)
-  Updated_At                                             DateTime?  @default(now()) @db.DateTime(0)
+  Finance_ID     Int        @id @default(autoincrement())
+  Personnel_ID   Int
+  Effective_From DateTime   @db.Date
+  Effective_To   DateTime?  @db.Date
+
+  // ۱) مزد ثابت ماهانه — مبنای روزانه = ÷ ۳۰
+  Base_Monthly_Salary  Decimal @default(0) @db.Decimal(18, 2)
+  // ۲) حق مسکن ماهیانه
+  Housing_Allowance    Decimal @default(0) @db.Decimal(18, 2)
+  // ۳) حق اولاد ماهیانه
+  Child_Allowance      Decimal @default(0) @db.Decimal(18, 2)
+  // ۴) پایه سنوات روزانه
+  Seniority_Daily_Base Decimal @default(0) @db.Decimal(18, 2)
+  // ۵) کمک هزینه اقلام مصرفی خانوار (ماهانه)
+  Household_Allowance  Decimal @default(0) @db.Decimal(18, 2)
+  // ۶) سایر مزایا (ماهانه)
+  Other_Benefits       Decimal @default(0) @db.Decimal(18, 2)
+
+  // اضافه‌کاری و فوق‌العاده — دست‌نخورده برای موتور محاسبه
+  Overtime_Multiplier  Decimal @default(1.40) @db.Decimal(5, 2)
+  OffHours_Multiplier  Decimal @default(1.80) @db.Decimal(5, 2)
+
+  // مزد تعطیل کاری / جمعه کاری — درصد افزایش نسبت به مبنای روزانه
+  Holiday_Hour_Multiplier Decimal? @db.Decimal(5, 2)
+  Friday_Hour_Multiplier  Decimal? @db.Decimal(5, 2)
+
+  Min_Weekly_Hours      Decimal @default(44.00) @db.Decimal(5, 2)
+  Max_Weekly_Overtime   Decimal @default(20.00) @db.Decimal(5, 2)
+
+
+  Week1_Max_Hours       Decimal? @db.Decimal(5, 2)
+  Week1_Max_Overtime    Decimal? @db.Decimal(5, 2)
+  Week2_Max_Hours       Decimal? @db.Decimal(5, 2)
+  Week2_Max_Overtime    Decimal? @db.Decimal(5, 2)
+  Week3_Max_Hours       Decimal? @db.Decimal(5, 2)
+  Week3_Max_Overtime    Decimal? @db.Decimal(5, 2)
+  Week4_Max_Hours       Decimal? @db.Decimal(5, 2)
+  Week4_Max_Overtime    Decimal? @db.Decimal(5, 2)
+  MonthEnd_Max_Hours    Decimal? @db.Decimal(5, 2)
+  MonthEnd_Max_Overtime Decimal? @db.Decimal(5, 2)
+  Max_Friday_Hours_Month  Decimal? @db.Decimal(5, 2)
+  Max_Holiday_Hours_Month Decimal? @db.Decimal(5, 2)
+
+  Commute_Amount        Decimal?  @default(0.00) @db.Decimal(18, 2)
+  Mission_Daily_Amount  Decimal?  @default(0.00) @db.Decimal(18, 2)
+  Currency              String?   @default("IRR") @db.VarChar(10)
+  Is_Active             Boolean?  @default(true)
+
+  Created_By            Int?
+  Created_At            DateTime? @default(now()) @db.DateTime(0)
+  Updated_At            DateTime? @default(now()) @db.DateTime(0)
+
   Personnel_PR_Personnel_Finance_Created_ByToPersonnel   Personnel? @relation("PR_Personnel_Finance_Created_ByToPersonnel", fields: [Created_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Finance_Creator")
   Personnel_PR_Personnel_Finance_Personnel_IDToPersonnel Personnel  @relation("PR_Personnel_Finance_Personnel_IDToPersonnel", fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Finance_Personnel")
 
@@ -402,6 +438,7 @@ model PR_Project_Assignments {
   Role_In_Project     String?     @db.VarChar(100)
   Project_Hourly_Rate Decimal?    @db.Decimal(18, 2)
   Personnel_Wage      Decimal?    @default(0) @db.Decimal(18, 2) // <--- 
+  Final_Bonus         Decimal?    @db.Decimal(18, 2)
   Is_Active           Boolean?    @default(true)
   Created_At          DateTime?   @default(now()) @db.DateTime(0)
   Personnel           Personnel   @relation(fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_PR_Assign_Personnel")
@@ -469,6 +506,9 @@ model PR_Tasks {
   Task_ID     Int       @id @default(autoincrement())
   Assigned_To Int 
   Assigned_By Int 
+  Reviewed_By Int?       // ✅ جدید: چه کسی تایید/رد کرد
+  Reviewed_At DateTime? @db.DateTime(0)
+  Reviewer    Personnel? @relation("TaskReviewer", fields: [Reviewed_By], references: [Personnel_ID])
   Title       String    @db.VarChar(255)
   Description String?   @db.Text
   Completion_Note  String?  @db.Text
@@ -531,7 +571,9 @@ model Personnel {
   Unit_ID             Int?
   OrganizationalPosition OrganizationalPosition? @relation(fields: [Position_ID], references: [Position_ID])
   Unit                 Unit?                 @relation(fields: [Unit_ID], references: [Unit_ID])
+  PR_Tasks_Reviewed PR_Tasks[] @relation("TaskReviewer")
 
+  PR_Monthly_Salary_PR_Monthly_Salary_Accountant_IDToPersonnel PR_Monthly_Salary[] @relation("PR_Monthly_Salary_Accountant_IDToPersonnel")
   PR_Commute_Logs_PR_Commute_Logs_Approved_ByToPersonnel            PR_Commute_Logs[]          @relation("PR_Commute_Logs_Approved_ByToPersonnel")
   PR_Commute_Logs_PR_Commute_Logs_Personnel_IDToPersonnel           PR_Commute_Logs[]          @relation("PR_Commute_Logs_Personnel_IDToPersonnel")
   PR_Daily_Reports_PR_Daily_Reports_Manager_IDToPersonnel           PR_Daily_Reports[]         @relation("PR_Daily_Reports_Manager_IDToPersonnel")
@@ -558,6 +600,10 @@ model Personnel {
   Work_Orders_Work_Orders_Technician_IDToPersonnel                  Work_Orders[]              @relation("Work_Orders_Technician_IDToPersonnel")
   Tasks_AssignedTo                                                  PR_Tasks[]                 @relation("TaskAssignee")
   Tasks_AssignedBy                                                  PR_Tasks[]                 @relation("TaskAssigner")
+  PR_Supervision_Subordinate PR_Supervision[] @relation("SupervisionSubordinate")
+  PR_Supervision_Supervisor  PR_Supervision[] @relation("SupervisionSupervisor")
+  PR_Supervision_AssignedBy  PR_Supervision[] @relation("SupervisionAssigner")
+  PR_Personal_Agenda PR_Personal_Agenda[]
 
   Led_Projects PR_Projects[] @relation("ProjectLeader")
 
@@ -916,10 +962,48 @@ model AnnouncementRead {
   @@unique([userId, announcementId])
 }
 
+// برنامه‌ریزی شخصی پرسنل
+model PR_Personal_Agenda {
+  Agenda_ID    Int       @id @default(autoincrement())
+  Personnel_ID Int
+  Event_Date   DateTime  @db.Date
+  Title        String    @db.VarChar(200)
+  Description  String?   @db.Text
+  Priority     String    @default("Normal") @db.VarChar(20) // Low | Normal | High | Urgent
+  Start_Time   String?   @db.VarChar(5) // "08:30"
+  End_Time     String?   @db.VarChar(5)
+  Is_Done      Boolean   @default(false)
+  Completed_At DateTime? @db.DateTime(0)
+  Created_At   DateTime  @default(now()) @db.DateTime(0)
+  Updated_At   DateTime  @default(now()) @updatedAt @db.DateTime(0)
+  Personnel    Personnel @relation(fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Personal_Agenda_Personnel")
+
+  @@index([Personnel_ID, Event_Date], map: "IX_Personal_Agenda_Personnel_Date")
+  @@index([Event_Date], map: "IX_Personal_Agenda_Date")
+}
+
+// سلسله‌مراتب سرپرستی — هر پرسنل یک سرپرست مستقیم (بدون رکورد = زیرمجموعه CEO)
+model PR_Supervision {
+  ID            Int       @id @default(autoincrement())
+  Personnel_ID  Int       @unique(map: "UK_Supervision_Personnel")
+  Supervisor_ID Int
+  Assigned_At   DateTime  @default(now()) @db.DateTime(0)
+  Assigned_By   Int?
+
+  Personnel     Personnel  @relation("SupervisionSubordinate", fields: [Personnel_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Supervision_Personnel")
+  Supervisor    Personnel  @relation("SupervisionSupervisor", fields: [Supervisor_ID], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Supervision_Supervisor")
+  Assigner      Personnel? @relation("SupervisionAssigner", fields: [Assigned_By], references: [Personnel_ID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Supervision_Assigner")
+
+  @@index([Supervisor_ID], map: "IX_Supervision_Supervisor")
+}
+
+
+
 enum PR_Monthly_Salary_Details_Detail_Type {
-  Deduction
-  Bonus
-  Other
+  Earning     // درآمد (تولیدی از موتور محاسبه)
+  Deduction   // کسورات (بیمه، مالیات، جریمه)
+  Bonus       // پاداش
+  Other       // سایر
 }
 
 enum WO_Statuses_Status_Category {
@@ -1033,9 +1117,10 @@ enum PR_Daily_Reports_Report_Status {
 }
 
 enum PR_Monthly_Salary_Status {
-  Draft
-  Calculated
-  Approved
-  Paid
-  Archived
+  Draft        // تولید خودکار — در انتظار بررسی/ویرایش حسابدار
+  Pending_CEO  // تایید حسابدار — در انتظار تایید مدیرعامل
+  Rejected     // رد توسط مدیرعامل — برگشت به حسابدار (قابل ویرایش مجدد)
+  Approved     // تایید نهایی مدیرعامل — برای کارمند قابل مشاهده
+  Paid         // پرداخت شده
+  Archived     // بایگانی
 }

@@ -1,21 +1,31 @@
-import { getPersonnelDetails } from '@/actions/personnelDetails'
-import PersonnelDetailClient from './PersonnelDetailClient'
+import { getPersonnelDetails } from "@/actions/personnelDetails";
+import { getWorkTypesAndLocations } from "@/actions/activitySettings";
+import PersonnelDetailClient from "./PersonnelDetailClient";
 
-// اضافه شدن await به params و searchParams
-export default async function PersonnelDetailPage({ 
-  params, 
-  searchParams 
-}: { 
-  params: Promise<{ id: string }>, 
-  searchParams: Promise<{ start?: string, end?: string }> 
+export const dynamic = "force-dynamic";
+
+export default async function PersonnelDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ start?: string; end?: string }>;
 }) {
-  // دریافت مقادیر از Promise
-  const { id } = await params
-  const { start, end } = await searchParams
+  const { id } = await params;
+  const { start, end } = await searchParams;
 
-  const data = await getPersonnelDetails(id, start, end)
+  const [data, workTypeData] = await Promise.all([
+    getPersonnelDetails(id, start, end),
+    getWorkTypesAndLocations(),
+  ]);
 
-  if (!data) return <div>پرسنل یافت نشد</div>
+  if (!data) return <div style={{ padding: "24px" }}>پرسنل یافت نشد</div>;
 
-  return <PersonnelDetailClient data={data} searchParams={{ start, end }} />
+  return (
+    <PersonnelDetailClient
+      data={data}
+      searchParams={{ start: start || "", end: end || "" }}
+      workTypes={workTypeData.types}
+    />
+  );
 }
